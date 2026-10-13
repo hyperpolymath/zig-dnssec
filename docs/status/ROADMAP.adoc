@@ -1,23 +1,49 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 = zig-dnssec Roadmap
 
-== Current Status
+== Current status
 
-Initial development phase.
+Experimental. The first milestone (codec, DNSSEC validation, DoH stub) is complete and
+tested, and has *not* been independently reviewed. See
+`docs/reports/VERIFICATION.adoc` for what is and is not verified.
 
-== Milestones
+== Milestone 1 — codec, validator, DoH stub (done, 2026-10-13)
 
-=== v0.1.0 - Foundation
-* [ ] Core functionality
-* [ ] Basic documentation
-* [ ] CI/CD pipeline
+* [x] RFC 1035 wire codec with strict decoding and name compression
+* [x] DNSSEC signature verification (algorithms 5, 7, 8, 10, 13, 14, 15)
+* [x] NSEC / NSEC3 denial of existence
+* [x] Chain-of-trust validator with explicit, non-downgradable verdicts
+* [x] DoH stub client and CLI
+* [x] Fuzzing (coverage-guided and standalone) with corpus
+* [x] Cross-check against Unbound and ldns on a fixed zone set
+* [x] CI workflow running the tests
 
-=== v1.0.0 - Stable Release
-* [ ] Full feature set
-* [ ] Comprehensive tests
-* [ ] Production ready
+== Next
 
-== Future Directions
+. *Independent review* of the validator, the proof logic, the parsers and the DoH
+  transport — before anything else relies on this code.
+. Report the Zig 0.17.0 `std.http.Client` CONNECT/TLS defect upstream.
+. Upstream the `rsr-template-repo` issues met at mint (`RSR_NON_INTERACTIVE=1` loops
+  on prompts, as the template's onboarding docs warn; a table cell lost to placeholder
+  deletion; references to the template's own issues renamed by the global
+  substitution; REPOSITORY-MAP.adoc and the coaptation receipt left stale; the
+  ABI/FFI seam below); add a Zig-library archetype so `build.zig` and
+  `build.zig.zon` are expected at the root.
+. Specialise the ABI/FFI seam in `src/interface/`. As minted it is the template's
+  generic example, not wired to this library: the Zig side does not compile on
+  Zig 0.17.0 (`Allocator.dupeZ` is gone), its `Result` enum differs from the Idris2
+  one, and the two sides name different symbols (`rsr_*` against `zig_dnssec_*`).
+  The replacement: an Idris2 model of the verdict at the seam, stating "no answer
+  data without secure or proven-insecure evidence" as a type (estate
+  epistemic-types work), and a Zig C ABI over the validator, with tests that keep
+  the two sides in step.
 
-_To be determined based on community feedback._
+== Later
+
+* DNS-over-QUIC transport (needs a QUIC implementation).
+* HTTP/2 for DoH.
+* Ed448 once it is available from a vetted pure-Zig implementation.
+* RFC 5011 trust-anchor rollover; negative trust anchors.
+* A cache, with aggressive NSEC use (RFC 8198).
+* Run the live-resolver smoke tests on a schedule.

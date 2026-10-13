@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 
 //! zig-dnssec — an experimental, pure-Zig DNS wire-format codec and DNSSEC
-//! validator with a DoH stub client. See README.md: this code has not been
+//! validator with a DoH stub client. See README.adoc: this code has not been
 //! independently reviewed and must not be relied on for security decisions.
 
 pub const sec = struct {

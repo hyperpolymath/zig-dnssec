@@ -1,63 +1,95 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-// SPDX-FileCopyrightText: 2024-2026 Jonathan D.A. Jewell (hyperpolymath)
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 = zig-dnssec
-:toc:
-:toc-placement: preamble
+:toc: preamble
 
-// ── Licensing ───────────────────────────────────────────────────────────────
 image:https://img.shields.io/badge/Code-MPL--2.0-blue.svg?logo=mozilla[Code licence: MPL-2.0,link="https://opensource.org/licenses/MPL-2.0"]
 image:https://img.shields.io/badge/Docs-CC--BY--SA--4.0-blue.svg?logo=creativecommons[Docs licence: CC-BY-SA-4.0,link="https://creativecommons.org/licenses/by-sa/4.0/"]
-image:https://img.shields.io/badge/Provenance-Quantum--Safe-blueviolet[Quantum-Safe Provenance,link="docs/legal/EXHIBIT-B-QUANTUM-SAFE.txt"]
+image:https://img.shields.io/badge/status-experimental-orange[Status: experimental]
 
-// ── Standard & quality gates ────────────────────────────────────────────────
-image:https://img.shields.io/badge/RSR-Rhodium_Standard-9C27B0[Rhodium Standard Repository,link="https://github.com/hyperpolymath/rhodium-standard-repositories"]
-image:https://api.scorecard.dev/projects/github.com/hyperpolymath/zig-dnssec/badge[OpenSSF Scorecard,link="https://scorecard.dev/viewer/?uri=github.com/hyperpolymath/zig-dnssec"]
-image:https://sonarcloud.io/api/project_badges/measure?project=hyperpolymath_zig-dnssec&metric=alert_status[SonarQube Quality Gate,link="https://sonarcloud.io/summary/new_code?id=hyperpolymath_zig-dnssec"]
-image:https://archive.softwareheritage.org/badge/origin/https://github.com/hyperpolymath/zig-dnssec/[Archived in Software Heritage,link="https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/hyperpolymath/zig-dnssec"]
+A pure-Zig DNS library: a strict wire-format codec (RFC 1035), DNSSEC validation of
+responses (RFC 4033–4035, RFC 5155) with chain-of-trust from a configured trust
+anchor, and a validating stub client that queries over DNS-over-HTTPS (RFC 8484).
 
-// ── Provenance & ecosystem ──────────────────────────────────────────────────
-image:https://img.shields.io/badge/Idris-Inside-5E5086?logo=idris&logoColor=white[Idris Inside,link="https://github.com/hyperpolymath/proven"]
-image:https://img.shields.io/badge/Zig-Zero--overhead-F7A41D?logo=zig&logoColor=black[Zig Zero-overhead FFI,link="https://github.com/hyperpolymath/typed-wasm"]
-image:https://api.thegreenwebfoundation.org/greencheckimage/github.com[Green Web,link="https://www.thegreenwebfoundation.org/green-web-check/?url=github.com"]
-
-Experimental pure-Zig DNS wire-format codec, DNSSEC validator and DoH stub client.
-
-[IMPORTANT]
+[WARNING]
 ====
-*This file is a template.* You are reading `README.adoc` from the *RSR template repo*
-(or a freshly-cloned copy of it). Run `just repo-init` to replace every `{{PLACEHOLDER}}`
-token with your project's details, then delete this admonition. Until you do, the
-`{{...}}` markers below are intentional placeholders, not content.
+*Experimental. Not yet independently reviewed.* Do not rely on this validator for any
+security decision until it has had an independent review by someone who did not write
+it. What has and has not been verified is set out in
+link:docs/reports/VERIFICATION.adoc[the verification report]; the known gaps and the
+trust-anchor assumptions are in link:docs/architecture/THREAT-MODEL.adoc[the threat model].
 ====
 
-== What this is
+It is not a recursive resolver: it asks an upstream resolver (with `CD=1`) and
+authenticates what comes back itself, fetching the DS and DNSKEY records it needs
+through the same transport.
 
-A new repository scaffolded from the *Rhodium Standard Repository (RSR)* template:
-a batteries-included starting point that ships with CI/CD, machine-readable project
-metadata, an AI-agent gatekeeper protocol, a formally-typed ABI/FFI seam
-(Idris2 + Zig), container and reproducible-build scaffolding, and governance
-infrastructure — all wired and passing the RSR validators on day one.
+== What it does
 
-Replace this section with a description of *your* project once initialised.
+* *Wire codec* — bounds-checked decoding that rejects malformed messages (compression
+  pointers must point strictly backwards; names in RDATA are decompressed only where
+  RFC 3597 permits; trailing data, misplaced OPT and meta-types are rejected), and an
+  encoder with name compression.
+* *Signatures* — RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256,
+  ECDSAP384SHA384 and ED25519, all through Zig's standard library; DS digests SHA-1,
+  SHA-256 and SHA-384. No cryptographic primitive is implemented here.
+* *Chain of trust* — DS → DNSKEY → RRSIG from the signer up to the closest trust
+  anchor, RRSIG validity windows in RFC 1982 serial arithmetic, CNAME and DNAME chains,
+  wildcard expansion.
+* *Denial of existence* — NSEC and NSEC3 proofs for NXDOMAIN, NODATA, wildcards and
+  insecure delegations, including Opt-Out and the RFC 6840 restrictions.
+* *Verdicts that cannot be downgraded silently* — the result is
+  `secure | insecure | bogus | indeterminate`. Answer data is reachable only from the
+  `secure` arm, or from the `insecure` arm together with the reason and the zone at
+  which insecurity was _proven_. Every failure is `bogus` or `indeterminate`.
+* *Stub client* — DoH over TLS 1.2/1.3 with certificate verification, optional HTTP
+  CONNECT proxy (TLS end to end), RFC 8467 query padding.
 
-== Quick start
+=== Not implemented
 
-[source,bash]
+DNS-over-QUIC (no QUIC in Zig's standard library), Ed448 and GOST/SM2 signatures, HTTP/2,
+RFC 5011 trust-anchor rollover, negative trust anchors, caching, QTYPE `ANY`. The full
+list, and what each gap means for a caller, is in the threat model.
+
+== Using it
+
+Requires Zig 0.17.0.
+
+[source,zig]
 ----
-# 1. Create a repo from this template (or clone it), then from the repo root:
-just repo-init                # interactive bootstrap: fills every {{PLACEHOLDER}}
+const dnssec = @import("dnssec");
 
-# 2. See the available tasks:
-just                     # lists all phases (build, test, validate, audit, ...)
+var anchors = try dnssec.sec.anchors.TrustAnchors.ianaRoot(gpa);
+defer anchors.deinit();
 
-# 3. Check the repo still satisfies the RSR shape:
-just validate            # structure + metadata checks
+var bundle: std.crypto.Certificate.Bundle = .empty;
+try bundle.rescan(gpa, io, std.Io.Clock.real.now(io));
+var doh = try dnssec.stub.doh.DohTransport.init(io, "https://dns.example/dns-query", &bundle, null);
+var stub: dnssec.stub.client.StubClient = .{ .transport = doh.transport(), .anchors = &anchors };
+
+var result = try stub.resolve(gpa, try dnssec.wire.Name.fromText("example.org."), .aaaa, now);
+defer result.deinit();
+switch (result.verdict) {
+    .secure => |answer| use(answer.rrsets),
+    .insecure => |i| decideWhetherUnsignedIsAcceptable(i.reason, i.zone, i.answer),
+    .bogus, .indeterminate => |failure| reject(failure.reason),
+}
 ----
 
-`just repo-init` prompts for the project name, owner, author, licence contact, and the
-other values listed in `.machine_readable/ai/PLACEHOLDERS.adoc`, substitutes them
-across the tree, validates the result, and (if available) runs the `k9-svc` checks.
+`StubClient.resolveSecure` returns an error for anything that is not `secure`.
+
+The command-line tool prints the verdict:
+
+[source,console]
+----
+$ zig build -Doptimize=ReleaseSafe
+$ ./zig-out/bin/dnssec-stub --doh https://cloudflare-dns.com/dns-query example.com. A
+verdict=secure reason=- at=- rcode=noerror
+example.com. 260 IN A 104.20.23.154
+...
+$ ./zig-out/bin/dnssec-stub --doh https://cloudflare-dns.com/dns-query dnssec-failed.org. A
+verdict=bogus reason=dnskey_not_authenticated at=dnssec-failed.org. type=dnskey
+----
 
 [[ai-install]]
 == AI-Assisted Installation (Recommended)
@@ -69,101 +101,35 @@ commands to paste):
 
 [source,text]
 ----
-Create a new repository from https://github.com/hyperpolymath/zig-dnssec
+Set up zig-dnssec from https://github.com/hyperpolymath/zig-dnssec
 ----
 
-The URL is the key: it leads the assistant to
-link:docs/AI_INSTALLATION_GUIDE.adoc[`docs/AI_INSTALLATION_GUIDE.adoc`], the
-complete step-by-step recipe. The assistant checks your system, installs the
-prerequisites, instantiates the template with `just repo-init`, and verifies the
-result with `just doctor`.
-
-* "Set up zig-dnssec so I can work on the template itself — https://github.com/hyperpolymath/zig-dnssec"
-* `./launcher.sh --ai-setup` (or `just ai-setup`) prints the line and the guide path.
-
-=== What you will be asked
-
-. Your operating system (Linux, macOS, or Windows via WSL2).
-. The new project's name, owner, author and licence contact (the values listed in
-  `.machine_readable/ai/PLACEHOLDERS.adoc`).
-. To confirm the privacy notice below.
-
-=== Privacy and security
+The URL leads the assistant to
+link:docs/AI_INSTALLATION_GUIDE.adoc[`docs/AI_INSTALLATION_GUIDE.adoc`]. It clones the
+repository, installs the toolchain pinned in `mise.lock` (Zig 0.17.0) with `just setup`,
+checks the result with `just doctor`, and runs `just test`.
+`./launcher.sh --ai-setup` (or `just ai-setup`) prints the same line.
 
 [IMPORTANT]
 ====
-Setting up zig-dnssec clones this repository and installs its developer
-tools per-user with mise (no administrator rights, nothing sent anywhere).
-`just repo-init` rewrites files only inside the new checkout; it creates no
-remote repository and pushes nothing until you do.
+Privacy: setting up clones this repository and installs developer tools per user; nothing
+is sent anywhere. Running the tests needs no network. Only the live examples above, and
+`dnssec-stub` without `--replay`, contact a DNS-over-HTTPS server.
 ====
 
-=== The one trap
+== Building and testing
 
-If you are an AI agent: **do not set `RSR_NON_INTERACTIVE=1`**. It stubs the
-shell builtin `read`, which also disables the loops that perform token
-substitution — the run never terminates and substitutes nothing. Pipe answers to
-stdin instead.
+[source,console]
+----
+zig build test                         # unit, RFC vector, denial, replay and fuzz smoke tests
+zig build fuzz --fuzz=500K -Doptimize=ReleaseSafe      # coverage-guided fuzzing
+zig build fuzz-tool -Doptimize=ReleaseSafe && ./zig-out/bin/dnssec-fuzz all 60
+tests/crosscheck/make-zones.sh && tests/crosscheck/servers.sh start && tests/crosscheck/run.sh
+----
 
-=== Troubleshooting
-
-Run `just doctor`; each FAIL carries a code explained in
-link:docs/SETUP.adoc#troubleshooting[`docs/SETUP.adoc` §Troubleshooting], and
-`just heal` applies the automatic fixes. Prefer to do it yourself? The full
-manual route is link:docs/SETUP.adoc[`docs/SETUP.adoc`]; developers and
-maintainers can brief an AI with `just ai-warmup dev` / `just ai-warmup maintainer`.
-
-== What you get
-
-* *Machine-readable metadata* (`.machine_readable/descriptiles/`) — `STATE`, `META`,
-  `ECOSYSTEM`, `PLAYBOOK`, `AGENTIC`, `NEUROSYM`, `CLADE`, and `anchors/ANCHOR`,
-  in deed, so tools and agents can read the project's state and boundaries.
-* *AI gatekeeper protocol* — `zig-dnssec_chora.deed` (the repo deed) is the
-  universal entry point that tells an AI agent how to work in this repo before it
-  touches anything; it carries the AI allocation policy and the ply directory tree.
-* *Typed ABI/FFI seam* — `src/interface/Abi/` (Idris2 type + layout proofs) over
-  `src/interface/ffi/` (Zig implementation), with generated C headers.
-* *CI/CD* — GitHub Actions for quality, security (CodeQL, Scorecard, secret
-  scanning), multi-forge mirroring, and RSR anti-pattern enforcement.
-* *Supply-chain & reproducibility* — container layering (stapeln), Guix shells,
-  SBOM, and signing hooks.
-* *Governance* — `GOVERNANCE.adoc`, `MAINTAINERS.adoc`, `.github/` community health
-  files, and a release `AUDIT.adoc` gate.
-
-== Repository map
-
-The authoritative map is generated, so it cannot drift from the tree:
-link:docs/architecture/REPOSITORY-MAP.adoc[docs/architecture/REPOSITORY-MAP.adoc]
-(regenerate with `just repo-map`; CI fails if it is stale).
-
-The short version:
-
-[cols="1,3"]
-|===
-| Path | What lives there
-
-| `README.adoc`, `CLAUDE.md` | Start here - humans and AI agents respectively.
-| `src/`, `tests/`           | The code and its tests.
-| `docs/`                    | Human documentation, including the full map above.
-| `.machine_readable/`        | Manifests, contractiles and policies that tools read.
-| `build/`, `Justfile`       | Every task runs through `just`; phases live in `build/just/`.
-| `ci/`, `.github/`          | CI configuration; GitHub reads `.github/` and no other path.
-|===
-
-== Where to go next
-
-* link:docs/architecture/REPOSITORY-MAP.adoc[The repository map] — generated; what every directory is for.
-* link:docs/EXPLAINME.adoc[EXPLAINME] — the engineering deep-dive: how the pieces actually work.
-* link:docs/AFFIRMATION.adoc[AFFIRMATION] — the dated, signed honesty snapshot of the repo's true state.
-* link:docs/AUDIT.adoc[AUDIT] — the release audit gate.
-* link:docs/AI_INSTALLATION_GUIDE.adoc[AI installation guide] — for agents instantiating this template.
-* link:.machine_readable/ai/PLACEHOLDERS.adoc[PLACEHOLDERS] — the full placeholder reference.
+The cross-check needs NSD, Unbound, ldns tools and haproxy; `build/container/Containerfile`
+provides them. Its latest output is link:tests/crosscheck/REPORT.adoc[`tests/crosscheck/REPORT.adoc`].
 
 == Licence
 
-Code, configuration and scripts are link:LICENSE[Mozilla Public License 2.0]
-(`MPL-2.0`); prose documentation is `CC-BY-SA-4.0`. Both texts live in
-`LICENSES/`, and per-file `SPDX-License-Identifier` headers are authoritative.
-The GitHub-detected licence is MPL-2.0 (the root `LICENSE`). Long-term
-attribution uses Quantum-Safe Provenance — see
-link:docs/legal/EXHIBIT-B-QUANTUM-SAFE.txt[the Quantum-Safe Provenance exhibit].
+Code: MPL-2.0. Documentation: CC-BY-SA-4.0. See `LICENSES/`.

@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+// Included by VERIFICATION.adoc.
+
+.Fuzz campaigns run on 2026-10-13 (Zig 0.17.0, ReleaseSafe, x86_64 Linux)
+[cols="2,2,1,1,1",options="header"]
+|===
+| Target | Harness | Budget | Runs | Findings
+
+| decoder (raw), decoder (mutated), NSEC3, presentation
+| coverage-guided, `zig build fuzz --fuzz=500K`
+| 500K runs each
+| 257,410 (stopped at the crash)
+| *1* (u8 overflow in name decoding; fixed, kept as corpus)
+
+| decoder (raw), decoder (mutated), NSEC3, presentation
+| coverage-guided, `zig build fuzz --fuzz=3M`, after the fix
+| 3M runs each
+| 12.0 M
+| 0
+
+| validator, differential
+| coverage-guided, `zig build fuzz-validator --fuzz=30K`
+| 30K runs
+| 31,237 (1,237 unique)
+| 0
+
+| decoder (raw)
+| standalone `dnssec-fuzz`, seed 0x2026
+| 60 s
+| 162,868,736
+| 0
+
+| decoder (mutated)
+| standalone, seed 0x2026
+| 60 s
+| 5,594,368
+| 0
+
+| NSEC3
+| standalone, seed 0x2026
+| 60 s
+| 147,516,160
+| 0
+
+| presentation
+| standalone, seed 0x2026
+| 60 s
+| 3,994,624
+| 0
+
+| validator, differential
+| standalone, seed 0x2026
+| 60 s
+| 41,728
+| 0
+|===
+
+Standalone runs on random input are dominated by cheap early rejections; the
+coverage-guided and mutated-seed runs are the stronger evidence. The differential
+validator campaign is slow (each run is a full chain validation with signature checks)
+and reached 2,541 of 29,625 instrumented points (8.6 %); the denominator counts the
+whole program, including standard-library code the harness never calls, so the figure
+says little on its own. Longer validator campaigns are an open item.

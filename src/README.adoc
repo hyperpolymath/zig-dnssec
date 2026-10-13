@@ -1,3 +1,20 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= src Pillar
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= src
+:toc:
+
+The Zig library (module `dnssec`, root `src/root.zig`) and its command-line tool.
+
+[cols="1,3",options="header"]
+|===
+| Path | Contents
+| `wire/` | DNS wire format: names (`name.zig`), message decoding (`message.zig`) and encoding (`builder.zig`), RDATA layouts and typed views (`rdata.zig`), registries (`types.zig`), presentation format (`text.zig`), Base32hex/Base64/hex (`encoding.zig`)
+| `dnssec/` | signature verification (`crypto.zig`), key tags and DS digests (`keys.zig`), RRsets and signed data (`rrset.zig`), NSEC and NSEC3 proofs (`nsec.zig`, `nsec3.zig`), trust anchors (`anchors.zig`), the chain-of-trust validator (`validator.zig`)
+| `stub/` | transport interface and replay transport (`transport.zig`), DNS over HTTPS (`doh.zig`), the validating stub client (`client.zig`)
+| `cli/` | `dnssec-stub`, a command-line front end
+|===
+
+The remaining directories (`aspects/`, `bridges/`, `contracts/`, `core/`, `definitions/`,
+`errors/`, `interface/`) are the RSR template's scaffolding. `interface/` holds the
+template's Idris2 ABI / Zig FFI seam; a C ABI and Idris2 bindings for this library are
+not part of the first milestone (see `docs/status/ROADMAP.adoc`).
