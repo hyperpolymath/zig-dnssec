@@ -9,6 +9,8 @@ pub const sec = struct {
     pub const crypto = @import("dnssec/crypto.zig");
     pub const keys = @import("dnssec/keys.zig");
     pub const rrset = @import("dnssec/rrset.zig");
+    pub const nsec = @import("dnssec/nsec.zig");
+    pub const nsec3 = @import("dnssec/nsec3.zig");
 };
 
 pub const wire = struct {
@@ -40,4 +42,6 @@ test {
     _ = @import("wire/text.zig");
     _ = @import("dnssec/keys.zig");
     _ = @import("dnssec/rrset.zig");
+    _ = @import("dnssec/nsec.zig");
+    _ = @import("dnssec/nsec3.zig");
 }
