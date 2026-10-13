@@ -1,0 +1,48 @@
+highiter.test.	3600	IN	SOA	ns1.highiter.test. hostmaster.highiter.test. 2026101301 3600 900 1209600 300
+highiter.test.	3600	IN	RRSIG	SOA 13 2 3600 20271001000000 20261001000000 30636 highiter.test. AWbp2/UdIqQeS/cJ4/Pxxh8it73fLus2sQJPcNqxwmdUg4z1GcpSg5/X7MRUicbekGGXmrq8q0ye7Bc0QaX2zw==
+highiter.test.	3600	IN	NS	ns1.highiter.test.
+highiter.test.	3600	IN	RRSIG	NS 13 2 3600 20271001000000 20261001000000 30636 highiter.test. jxHPoBRm9Pd1n1VNFQk6mXXslTNGUso4vDfJOe66rr7xyRvPGqvRDf30prUzVVI4pGb9ohZXKXgyirQjQgJmLQ==
+highiter.test.	3600	IN	MX	10 mail.highiter.test.
+highiter.test.	3600	IN	RRSIG	MX 13 2 3600 20271001000000 20261001000000 30636 highiter.test. yww/RLhTqKGg35HxUFkOHm5fjdJksmY3HoPF6FtQ0apuQcqnNN+rAuiGk2J8XvmtqtjlFzW8Ik/6BjvJzFMgGg==
+highiter.test.	3600	IN	DNSKEY	257 3 13 Rqr0JyDoRuAKXUzuNjvWdZ5o+aJSc2hAnayVS6TUyU212HVs2WZllBjc/1zpRAtsR7vDjXFoqGVEDZSG/KIHtQ== ;{id = 30636 (ksk), size = 256b}
+highiter.test.	3600	IN	RRSIG	DNSKEY 13 2 3600 20271001000000 20261001000000 30636 highiter.test. 9dWT0iPTRlKr421OcQTe8MAvNbxRrSvMCqgV0uHMQKQJz48TWQ3fKlBbEcMTs4RfrhakixXZpW0xIRQkekZbXw==
+highiter.test.	3600	IN	NSEC3PARAM	1 0 200 01 
+highiter.test.	3600	IN	RRSIG	NSEC3PARAM 13 2 3600 20271001000000 20261001000000 30636 highiter.test. SqfULI71ksSf9ujXotQVSWq58PS/sSHUX3c6lQnijeRQ54K1yG3aNQwPbMT0p0BGmyfmQ1i4zSK0dl5qZDRbag==
+60d5454kcm8icfctu3p84icob5kvlqlb.highiter.test.	300	IN	NSEC3	1 0 200 01  6o9ub97lkufoqvapm8tpmqof32vtdsm8 NS SOA MX RRSIG DNSKEY NSEC3PARAM 
+60d5454kcm8icfctu3p84icob5kvlqlb.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. jGkpgimhu6djXuSqGjMCGZcETKgFiZpW00MjTB8tkv50Fp98REaSvkUyN37M4bEPFHrh68NRHzRpIv/u2OXtDA==
+alias.highiter.test.	3600	IN	CNAME	www.highiter.test.
+alias.highiter.test.	3600	IN	RRSIG	CNAME 13 3 3600 20271001000000 20261001000000 30636 highiter.test. FzTUP4BwQfmED9GrT3Lw8EOF0c/v+aIBylmVygCq3Y9w4IikGpT98O1KHnomownQphkWQTtE+fbHt42t9roaFg==
+06lbe64n6t0hj3u3j0tdiqfs25eparhm.highiter.test.	300	IN	NSEC3	1 0 200 01  1jqh5092ueqi97v587sn82n95q178p8m CNAME RRSIG 
+06lbe64n6t0hj3u3j0tdiqfs25eparhm.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. Ceoy8mg2/2iunFOHIMEcYe7GM4vef9hFcd2KR/Fkl0tItXFHtCUtYOKN1HVMZRgzeogx/C0NFiLvF9itXgTuIw==
+edeku4sm5se7fcpproi8q6jupriovu48.highiter.test.	300	IN	NSEC3	1 0 200 01  hakljhnbkh1g09ju1l0oc4hv70cfdll5
+edeku4sm5se7fcpproi8q6jupriovu48.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. fPVgUeyLVFp25pOhPoR+S+XuAEGZxpn3g7c6gznCoRiuaC2EKwDqJMV4LzszImvXdmKyqLDEHZNGwi0p3QhG7g==
+hakljhnbkh1g09ju1l0oc4hv70cfdll5.highiter.test.	300	IN	NSEC3	1 0 200 01  r2i23e7i0tjs39oga1amdp3lob6u7n83
+hakljhnbkh1g09ju1l0oc4hv70cfdll5.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. eIOseDB1kwJ48NpVA54/N146IQGT8OWliJOSEVhRoKwzervFZCpeuDvUtkzNpXWCCiQj3w/9mda1QasHS+CyaA==
+a.b.ent.highiter.test.	3600	IN	A	192.0.2.50
+a.b.ent.highiter.test.	3600	IN	RRSIG	A 13 5 3600 20271001000000 20261001000000 30636 highiter.test. ry3yRXCHRhsbd389UBLfxtw81vepJMqyxyuYbtmrRm0rfqBU0r06diE+ygbsmvGjeAAa2xcsbQrF4Dw0ZgcfKg==
+tempodrpu6tcoaneq591k9n39t5fj7uq.highiter.test.	300	IN	NSEC3	1 0 200 01  06lbe64n6t0hj3u3j0tdiqfs25eparhm A RRSIG 
+tempodrpu6tcoaneq591k9n39t5fj7uq.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. GCUuegqJFymWHUO9AkGxX+fTmB9++VfbCPF57XCzsmU5M2O4nYd90qU4jlV2akBNng6YBaWO3I2x97AmaBcbuw==
+mail.highiter.test.	3600	IN	A	192.0.2.25
+mail.highiter.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 30636 highiter.test. J6LJmbp4l4UubRCBF2u35n3iCbh4HsRnsKmI3aH5b9LoVLSrOwkmJQ7dj35UJPdyRsH4fJjgWQAjhyQaJx95xw==
+r2i23e7i0tjs39oga1amdp3lob6u7n83.highiter.test.	300	IN	NSEC3	1 0 200 01  tempodrpu6tcoaneq591k9n39t5fj7uq A RRSIG 
+r2i23e7i0tjs39oga1amdp3lob6u7n83.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. HdY6MNMrQrtV/8jf+sCkOlYAQAl4/xOxa2GHHxjPLvqQni0ws1STem/BJzhNv0KoMKoPuwJH/MX34WHlIdQZXw==
+ns1.highiter.test.	3600	IN	A	127.0.0.1
+ns1.highiter.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 30636 highiter.test. eGMpYeaDJs6jD/Xbu5kg7TA2Tpud1NO1juRtWb8MS18I3d4XOGnTq5w26NVBC+WLWBW0+i62BCPIbw0cb+0EHg==
+6o9ub97lkufoqvapm8tpmqof32vtdsm8.highiter.test.	300	IN	NSEC3	1 0 200 01  7hrb9nfb613g22novemq5odf70v08hrs A RRSIG 
+6o9ub97lkufoqvapm8tpmqof32vtdsm8.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. xlHEfWMPuzaU35Al0n7oDyqNIH/JcsKjNJVfOKT9TtEesFQBKSzyO9M8JL/ttTgPBtiOy2hLA2ccCxBoip0MWw==
+txt.highiter.test.	3600	IN	TXT	"zig-dnssec cross-check fixture"
+txt.highiter.test.	3600	IN	RRSIG	TXT 13 3 3600 20271001000000 20261001000000 30636 highiter.test. kHC82446R3Fv2J2P4Bv9BZ4oWw2A4Jdg0Uiskewma/pRwVVYF0J68wJkrvwIZsjrSAlV/gWaFJq7Y6YNFk5CCQ==
+chl1rp5l5qf4ki118d3uph8dl3v3258a.highiter.test.	300	IN	NSEC3	1 0 200 01  edeku4sm5se7fcpproi8q6jupriovu48 TXT RRSIG 
+chl1rp5l5qf4ki118d3uph8dl3v3258a.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. W4ZColx9EOrcVjTcXU41ObzNmkjDH/HPwOQb+a//ZZeZl2VxI+M3efJ9Wkd0ryKEUnvdGWBPBfwx5ARsPgKlMQ==
+1jqh5092ueqi97v587sn82n95q178p8m.highiter.test.	300	IN	NSEC3	1 0 200 01  60d5454kcm8icfctu3p84icob5kvlqlb
+1jqh5092ueqi97v587sn82n95q178p8m.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. oZ+PtYVTcZEZiVHwyDI6XXF+pAE+g3dqAQUB1Mgi+k//fCwYIn74QojY1PKxCAXp8VgvZnVyN8dn7/QJcbp48w==
+*.wild.highiter.test.	3600	IN	A	192.0.2.99
+*.wild.highiter.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 30636 highiter.test. hIcg1zctKKT9JkgGF6iuLJeY+J8P2hzBXFg7TYBMFbl8BjYt6CXcCyTSVIywSngYQaafGsEkIjNHL2g3zBOkQg==
+7hrb9nfb613g22novemq5odf70v08hrs.highiter.test.	300	IN	NSEC3	1 0 200 01  a3a7g2t1iu7q276ii5buchgbvlftjejv A RRSIG 
+7hrb9nfb613g22novemq5odf70v08hrs.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. 1zBDTGo5ehsV7PACtCCQnKWx1DVGAjP30coLmIkR+KZ+TBgWGrlyoOHlOx/g73NMv30ecQ1BodBd3tCM6oDt4g==
+www.highiter.test.	3600	IN	A	192.0.2.1
+www.highiter.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 30636 highiter.test. M5S66puXKFhnaFD5EtBbt4lTDPtdpTcFvm6EuRmr0tfcLZUO+ApzeadodkVdoJwThPIh69jV7fSih2rDuctQQw==
+www.highiter.test.	3600	IN	AAAA	2001:db8::1
+www.highiter.test.	3600	IN	RRSIG	AAAA 13 3 3600 20271001000000 20261001000000 30636 highiter.test. 9Vb2Gdf00t99BYIIit8Jo904Rlw+4aLhDvgZkI8I8TtDEQRzxYnUVJjyMOnXb5hW0BzAyd+wyHu6IfzHgWAanA==
+a3a7g2t1iu7q276ii5buchgbvlftjejv.highiter.test.	300	IN	NSEC3	1 0 200 01  chl1rp5l5qf4ki118d3uph8dl3v3258a A AAAA RRSIG 
+a3a7g2t1iu7q276ii5buchgbvlftjejv.highiter.test.	300	IN	RRSIG	NSEC3 13 3 300 20271001000000 20261001000000 30636 highiter.test. 9kqD4KMILtWRg/XureP2NDUPP5XGu5ceve07dzaVxQW1qR6vQkPRLe35cdBM6jGVDPqVHinaYHVqAD34v4VM+g==

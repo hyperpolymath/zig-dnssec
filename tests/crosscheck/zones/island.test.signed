@@ -1,0 +1,40 @@
+island.test.	3600	IN	SOA	ns1.island.test. hostmaster.island.test. 2026101301 3600 900 1209600 300
+island.test.	3600	IN	RRSIG	SOA 13 2 3600 20271001000000 20261001000000 65273 island.test. fR8NQz8NtmaV6yz/+GwzZqZZY5LgoS88hRVNMiyfvHAVfLR8+0X/ZH6jCrAC2OoiEaAXYmneutIkTqGswsQY+A==
+island.test.	3600	IN	NS	ns1.island.test.
+island.test.	3600	IN	RRSIG	NS 13 2 3600 20271001000000 20261001000000 65273 island.test. v7wIYldYr8T1SRppdMp04QA2ir1fLd530Vtu1YI01PFyqMnwb7l8oUsyl9kUmB+hWLYyT0MGvrkgKUjr+GdZuA==
+island.test.	3600	IN	MX	10 mail.island.test.
+island.test.	3600	IN	RRSIG	MX 13 2 3600 20271001000000 20261001000000 65273 island.test. NDUARWMmzYs7g88+RPE9+ZbedxSD49Z55X989oA3n4s4UBdz9x4pXglN/vFyRDt6odFSf3bLgv4bdwf43vnIOQ==
+island.test.	3600	IN	DNSKEY	257 3 13 O2BGSZFEbAKy5NdvF4kdLuY+duAOTQMj5FMG31B4EVfyiOpVarKoj3KRpabXfTAq4gc4mbJlxf/dvg1VzMOmfg== ;{id = 65273 (ksk), size = 256b}
+island.test.	3600	IN	RRSIG	DNSKEY 13 2 3600 20271001000000 20261001000000 65273 island.test. LOSAan2myW/YN9US9Xp0L/zuk21L2mrvJuqz7rwOq7/3WbkcEAtbD8Hn+7OnKqpDUNYjiB03MVaG1lDEXBkTBQ==
+island.test.	300	IN	NSEC	alias.island.test. NS SOA MX RRSIG NSEC DNSKEY 
+island.test.	300	IN	RRSIG	NSEC 13 2 300 20271001000000 20261001000000 65273 island.test. 9epgl1pPQQRE1kDLhTn2eTiAyL42ZY0T95SVw/yWlRlpAywP4+7iMSXxyMWG+7r2aimNgxM6OtOf2aWZ0SS9dA==
+alias.island.test.	3600	IN	CNAME	www.island.test.
+alias.island.test.	3600	IN	RRSIG	CNAME 13 3 3600 20271001000000 20261001000000 65273 island.test. Vjn+phJgoJ0SQQYWXGXVLF4orJQysraH4QVxOCxBt574aL+izS8nApyi9riy/HcwFPRXYOtHumW1/C1jB2eOwQ==
+alias.island.test.	300	IN	NSEC	a.b.ent.island.test. CNAME RRSIG NSEC 
+alias.island.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 65273 island.test. WQC2kQ65aMfg6y7pG+mb238Nd6a0vRPEiSPByQEziNiqMX8rrfUa+SBrVFv+0hLF+0BduSMNMetfRT/iM2lEcg==
+a.b.ent.island.test.	3600	IN	A	192.0.2.50
+a.b.ent.island.test.	3600	IN	RRSIG	A 13 5 3600 20271001000000 20261001000000 65273 island.test. brF+RjPtRXqSOiNjwuFoVYy0OtZuZMrGu6S7n42gy6WZVYQVdbQhFtzsZMooSadgR/zrbhNLHahfVH0g9w4HPQ==
+a.b.ent.island.test.	300	IN	NSEC	mail.island.test. A RRSIG NSEC 
+a.b.ent.island.test.	300	IN	RRSIG	NSEC 13 5 300 20271001000000 20261001000000 65273 island.test. bYeONUHha7wHFLbheKpAOeji/C0pWd1rw0snqgVE2fUrymKFEES8j3JLF/2lR4mKVD2fchv2gQNrboXAm9XbeA==
+mail.island.test.	3600	IN	A	192.0.2.25
+mail.island.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 65273 island.test. KEldvi0BdzaI+Wv4AHnU8Xbr95MxQr8i9OD3BKkuEvWQxa3YVdLA9Vo/U6u9NiKQE4XoY1JoPOHmulzxY6X6Dg==
+mail.island.test.	300	IN	NSEC	ns1.island.test. A RRSIG NSEC 
+mail.island.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 65273 island.test. clH8XJtfXbbk/bpFFYPZUOKbzbpP9yMl8aFWWDVGe85AJyxnqxth2rtI2vXlDyNyqdqVKfDNUcZpuS7PnArp7A==
+ns1.island.test.	3600	IN	A	127.0.0.1
+ns1.island.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 65273 island.test. X7M2YiiMSuh1TCw6L038p/muNcDWNi9UwrDQ31K0y+nJLMGJuUIYDdIeSKU2rkuL4vSQiQO9/PW0Wqm4zV0o/w==
+ns1.island.test.	300	IN	NSEC	txt.island.test. A RRSIG NSEC 
+ns1.island.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 65273 island.test. k1sL6FiVfKq68LEiMQBwQUkno00FBg9nvAsD96PBqIAwimvxOMmjuPHRwsagNKrxILLnZgnWPRs9WvJEUDbuCg==
+txt.island.test.	3600	IN	TXT	"zig-dnssec cross-check fixture"
+txt.island.test.	3600	IN	RRSIG	TXT 13 3 3600 20271001000000 20261001000000 65273 island.test. cunnyJvTBxSavKx3iLQo9FyUc0ZVfSfZ0RAz73dcCVa+myxosPxVld3P8QX9I4ckCDSvaYfE7ck9sbXVOcGRVg==
+txt.island.test.	300	IN	NSEC	*.wild.island.test. TXT RRSIG NSEC 
+txt.island.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 65273 island.test. KGszpuxjW14JO495u4+QI8czyjQcuCwQIUanm5pUgKCvixqcYkyIFt38qbcJ5bZR7N1FCdGpYX3YKySQwpqbtw==
+*.wild.island.test.	3600	IN	A	192.0.2.99
+*.wild.island.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 65273 island.test. kqaITEvnKXCuT4RL7ndgbg4qsrBUpDs3pbEC+YB1A43HKlXwK++loJvWBMFYHSfHTpCt7IuRUWu2Ipd0VoJtNQ==
+*.wild.island.test.	300	IN	NSEC	www.island.test. A RRSIG NSEC 
+*.wild.island.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 65273 island.test. vAo1nBzfKRaG357EA9kolcu6B4nt0csz8rAzODtO+jhsqS9qJZKlWktr+bGLLuRDkRhDdg+uT3wMcvgXvoxa/g==
+www.island.test.	3600	IN	A	192.0.2.1
+www.island.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 65273 island.test. uPNnaHCj9zQFh8bYugCSsFpsDI3xHh/DGF9qugLam+N1pP7Md9fynAuzQEkb7F9MCO4wBZaftt1UbHLxrLsTUg==
+www.island.test.	3600	IN	AAAA	2001:db8::1
+www.island.test.	3600	IN	RRSIG	AAAA 13 3 3600 20271001000000 20261001000000 65273 island.test. hCiaeHHOPgu2vCBHA+6YPlDDpSEn7c+M0UNsBphejUAoN3SIAuKzdiZ+SFw6fkQFPrNQYYedKniBAcv10KVjGQ==
+www.island.test.	300	IN	NSEC	island.test. A AAAA RRSIG NSEC 
+www.island.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 65273 island.test. Aa61hMUwaVRezUAYjsVVR6eIrCvn5qJIE9x7e47OD88mbVXN1Zl32L88C2JfJZTK6l9ZxdvBh8Fu/kaIpjpSRQ==

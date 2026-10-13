@@ -1,0 +1,40 @@
+wrongkey.test.	3600	IN	SOA	ns1.wrongkey.test. hostmaster.wrongkey.test. 2026101301 3600 900 1209600 300
+wrongkey.test.	3600	IN	RRSIG	SOA 13 2 3600 20271001000000 20261001000000 51879 wrongkey.test. EkfELUN7WL0cuS7rrTCuBWQFKfg+t0yG4DhQlVkj6/+nb6offdH02xu3t/RLNWeGuCLtmBXm5yBG7hUSgOSNTQ==
+wrongkey.test.	3600	IN	NS	ns1.wrongkey.test.
+wrongkey.test.	3600	IN	RRSIG	NS 13 2 3600 20271001000000 20261001000000 51879 wrongkey.test. WM9+0Ia1gLwKEXMPZbdHmSjXwnAjG7vh26UYDcLF3uuvn6v2IuEgZPH1jojeJinyFU6tSd7HeKxIoqMz3Lsgng==
+wrongkey.test.	3600	IN	MX	10 mail.wrongkey.test.
+wrongkey.test.	3600	IN	RRSIG	MX 13 2 3600 20271001000000 20261001000000 51879 wrongkey.test. MZDcpxdEnKBLDK0YDljgaNpz8cguHVPekuvk7tDw77N5cZ2vL/8QOKZujAibUz4D4RiZxJdN8D6stNkV0mb7ow==
+wrongkey.test.	3600	IN	DNSKEY	257 3 13 ZpdtZAzVlcAL4YnmQGNJyr+U+AiT7JVf2nUJ/V7BP+Yswj1tLnldA17rKUxhW4sOJH4NOJDGSj/2Jo/e43zrgg== ;{id = 51879 (ksk), size = 256b}
+wrongkey.test.	3600	IN	RRSIG	DNSKEY 13 2 3600 20271001000000 20261001000000 51879 wrongkey.test. f604R0Wl5Nps8ta5jBNt0py8/3iEAnQTTCdX94Pnyh0SIiVwIEvbC8KYz9iE6wU35kiFyCN28JrVFj5dKTvBHw==
+wrongkey.test.	300	IN	NSEC	alias.wrongkey.test. NS SOA MX RRSIG NSEC DNSKEY 
+wrongkey.test.	300	IN	RRSIG	NSEC 13 2 300 20271001000000 20261001000000 51879 wrongkey.test. Rhljs8D+GhW/NRcRbWMuVYbMQ9pZ2pD8aNbticb1SeQmQhyOzeyZ4rqQLBK8Uwgp6BueJHw9Yl5gx8IxFo6kEw==
+alias.wrongkey.test.	3600	IN	CNAME	www.wrongkey.test.
+alias.wrongkey.test.	3600	IN	RRSIG	CNAME 13 3 3600 20271001000000 20261001000000 51879 wrongkey.test. eitcD0stUihANVAzqNzJO6at6X3k2eNsGCjw1vnuAocoMubhYLP7mySfNYUKjKkhmhbFiBEWA27RXxOLEB9X2A==
+alias.wrongkey.test.	300	IN	NSEC	a.b.ent.wrongkey.test. CNAME RRSIG NSEC 
+alias.wrongkey.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 51879 wrongkey.test. NVUHIZK44dulwh34pET+N+wpO5pOiUalq4EKq7FXDq61pevuSqHmYgVcRZSxCFj3I9WCbSWQ3JZuOpy7c4lAww==
+a.b.ent.wrongkey.test.	3600	IN	A	192.0.2.50
+a.b.ent.wrongkey.test.	3600	IN	RRSIG	A 13 5 3600 20271001000000 20261001000000 51879 wrongkey.test. EHSvI1au0FiMTKsv7VAS9zau7EyMds47UwtWchAelUYzvqY76vPN/+VuT6qPcrd697gvPuIMFTVG2LaKMT2R/w==
+a.b.ent.wrongkey.test.	300	IN	NSEC	mail.wrongkey.test. A RRSIG NSEC 
+a.b.ent.wrongkey.test.	300	IN	RRSIG	NSEC 13 5 300 20271001000000 20261001000000 51879 wrongkey.test. bNxQ+LHQvjk/+rea6s53jMWjNSAsYrlYBzRAvgB+gGVEJQkK6xPK3oYzcWQ3KQhNzc90DNw6UdOoFKG4PNebMQ==
+mail.wrongkey.test.	3600	IN	A	192.0.2.25
+mail.wrongkey.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 51879 wrongkey.test. fIq/4CzWF0S/5NpfAg1AjXG57sAjk1B7pMYd569bt0X7UqCYLwHArbS0bB5qUt6h2aB6LNxcQpWvynIyi5NG3Q==
+mail.wrongkey.test.	300	IN	NSEC	ns1.wrongkey.test. A RRSIG NSEC 
+mail.wrongkey.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 51879 wrongkey.test. zICQFyJzqp986JjPWwG5+Hiw/3gg9rbgrm3Q2nk6k5uHF0/Hse/2kWa5BLOyfolKu1/0y1GVp7ddG+6Ef0JKCg==
+ns1.wrongkey.test.	3600	IN	A	127.0.0.1
+ns1.wrongkey.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 51879 wrongkey.test. 4+Dl2P88h+AoAXkbCtPH3FwzOPhxHMpOkacnzIpGCp/VQC2iXgOwcjERoQxiY+ksivvCoaR65+7/hjjrrRRXaQ==
+ns1.wrongkey.test.	300	IN	NSEC	txt.wrongkey.test. A RRSIG NSEC 
+ns1.wrongkey.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 51879 wrongkey.test. se05HcZUqKlBzkxeGi4IQ9U3RuPP9jp6a02croZuf7p5qg9f+MQ3RRlbl/fk7iQvLDE8JaqtYoW/lx1jNkbTyA==
+txt.wrongkey.test.	3600	IN	TXT	"zig-dnssec cross-check fixture"
+txt.wrongkey.test.	3600	IN	RRSIG	TXT 13 3 3600 20271001000000 20261001000000 51879 wrongkey.test. OgqK5uZbF4XzpYfjzdR9aUEUEAIAyNes5c/U93EgoA6oHj+u5/JchQ8R5K7RaTcpsv9FNuP3jDviRB9rGqfCgw==
+txt.wrongkey.test.	300	IN	NSEC	*.wild.wrongkey.test. TXT RRSIG NSEC 
+txt.wrongkey.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 51879 wrongkey.test. ZJfEGC7ZCtGxWtUTcPKqgsVle4eKX26VViqdCa1gqqe9vD8bgyvY8H0jrVtROLR75jsTeCUw2pTw5fzhCsIvwA==
+*.wild.wrongkey.test.	3600	IN	A	192.0.2.99
+*.wild.wrongkey.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 51879 wrongkey.test. 3C+yyxdA0UX2J02kHOxCeV6YrFEsAG8wN3UVcu8DoPvMrDliMhg3cgB5Bf3M9oLa6g2OraB+4vkx3q/TFDZZ1g==
+*.wild.wrongkey.test.	300	IN	NSEC	www.wrongkey.test. A RRSIG NSEC 
+*.wild.wrongkey.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 51879 wrongkey.test. yGvkeKoWOgKDB6CSwHz23sG3DuEU7gWHktJRLxpJ2ZiXpGmJWz/vbItqgJRowMHEPg/VcuIOrqvay68w7EjJTA==
+www.wrongkey.test.	3600	IN	A	192.0.2.1
+www.wrongkey.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 51879 wrongkey.test. 3in4w5DiMeaO212L3dxH3p5Ozv92xefKnX8XeQOSDdW8WVeyiE9pOvoSWY6Eb9cRK7CEA4t6Qi6c8TQPKPfCdg==
+www.wrongkey.test.	3600	IN	AAAA	2001:db8::1
+www.wrongkey.test.	3600	IN	RRSIG	AAAA 13 3 3600 20271001000000 20261001000000 51879 wrongkey.test. N65tlNhk2ZyW6x3wRK/z+A4lYmkG2z5UTta/1bju3Gg8YEkjkkY90yPLGIVNTDjmhKjPJ7CLsMpTeeJu6Ann/A==
+www.wrongkey.test.	300	IN	NSEC	wrongkey.test. A AAAA RRSIG NSEC 
+www.wrongkey.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 51879 wrongkey.test. WpgpfpdLAck0Dh6Gin2bwLPekc0EtjdU5kLshs1oO8X5dvgmRNudwZ/9BRJOCdn6oYQbKNegYttL/rkPvAwnIg==

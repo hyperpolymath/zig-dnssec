@@ -1,0 +1,48 @@
+nsec3sha1.test.	3600	IN	SOA	ns1.nsec3sha1.test. hostmaster.nsec3sha1.test. 2026101301 3600 900 1209600 300
+nsec3sha1.test.	3600	IN	RRSIG	SOA 7 2 3600 20271001000000 20261001000000 32395 nsec3sha1.test. k9JScXqIfpvLWnGhBgPTQkTHtaHBKbZUVAl508BisGFmdWsUUlCtyvKdPuGZZvBGH0fLEvTI/NyJwYdfj6JeNiKOAlwg74VVLyanQcdMm3+4D6oEhW6krELngvorWok4z83na6B27mvjsCZW+FJ05FbOlIoxB0TsSSJ1o12JfxQ=
+nsec3sha1.test.	3600	IN	NS	ns1.nsec3sha1.test.
+nsec3sha1.test.	3600	IN	RRSIG	NS 7 2 3600 20271001000000 20261001000000 32395 nsec3sha1.test. Z40fxVv+wsApObO0AP/RkA6oU+zzX3kugvT74f78l4ElqMCX23oycd3jCQqKJO2Za4jO/ATdI3HB+7cObaRQh3Nzq/Zzlc85EwcWb0HaFeKFvtzJo+k4PP46XB17b/fyxuEsidMLWEieFnLv3TJoNM67DLmBmHucMIx6nC3q4UA=
+nsec3sha1.test.	3600	IN	MX	10 mail.nsec3sha1.test.
+nsec3sha1.test.	3600	IN	RRSIG	MX 7 2 3600 20271001000000 20261001000000 32395 nsec3sha1.test. Cj83VDJ1abDKwh+bvjeR95IB+ber0p8zKvWgKQLzabVs/Ctmm5j4iKRVdMW2iivJ0i/e06i3L5x+fblGwEU7fAxJIXciRfwQ53IfEGBHdiIJ7/AlcZX4llazEMQlisEsy2Th9wInNbXrJ2yKMw/NdIHRDG16PK7OFZM9svD700c=
+nsec3sha1.test.	3600	IN	DNSKEY	257 3 7 AwEAAdXuy97PfUxcv1LSp4MuZg2JpZu1KERXdClDxQKDrNhxZCN+SKBZRRlg6LFLAeJJ9KhW46hMBrRv0n9B0Mh8/JoNSoKTehRq6Sa7jok13Wv+tgfKeAF/TrE9Z6LtzerC0VUIGNii1j31y08+pn7DGn6y+y08zNjPrrCRFJn4coll ;{id = 32395 (ksk), size = 1024b}
+nsec3sha1.test.	3600	IN	RRSIG	DNSKEY 7 2 3600 20271001000000 20261001000000 32395 nsec3sha1.test. DjOYFF9qWuaaVYm3lmhrmw4J20xEQvoMhaRqyuR4wgw9flNO6ljThakVx9xCx4lye0Vc28o+0IgGf6ROKjfrLyXRe0B3+Vt0/4Nn19nyRwHCN0ER2jLgM/7XQ4M4sEH2EpL8dCieeuFEPc9ResIL9DL/mCAlJEB0RdcS7YtwVA0=
+nsec3sha1.test.	3600	IN	NSEC3PARAM	1 0 5 aabbccdd 
+nsec3sha1.test.	3600	IN	RRSIG	NSEC3PARAM 7 2 3600 20271001000000 20261001000000 32395 nsec3sha1.test. j37wIoLX4lVh4jmfH3XZazzlIPi/VGBi56v4J9ZqE3+Z0C0fV2w1hgLnUmnbCIh5dFk6KW63QUywfncZn5egdJAvhgw/oHMnMkft9aLr+UPscddY0wtGkJ5j62vjeuOOaTTmFf5FD4h/lDlGfyejJZaLcyRUeRvfpdLSzJ2q65w=
+mvte72h9hkjtqjn1ij1mlccva6pm1otg.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  o3hq9es30l1tfkoiprbcqc2n5d7tak4i NS SOA MX RRSIG DNSKEY NSEC3PARAM 
+mvte72h9hkjtqjn1ij1mlccva6pm1otg.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. BmkdkAewCxMYVi/VE3IDRgT7PNGR48E0S+MeX7nwdB0F3pbFA4lUjAxtZRk8Xg/H6zDUZrGb1gz/Jw6HnwFtT85tY4meg7BqYA123qUfKcuFv+JJSdfZyGS6bLksUcGRaQ2m6CeAr7VvvQoeAI0Ryv0TqQdxLGXSnuGMOabzbSE=
+alias.nsec3sha1.test.	3600	IN	CNAME	www.nsec3sha1.test.
+alias.nsec3sha1.test.	3600	IN	RRSIG	CNAME 7 3 3600 20271001000000 20261001000000 32395 nsec3sha1.test. FVECa8FOkUSII9m8uE/ah3pYKljQx5rC314+q/OeffYNlYbShsoGzBTACf2fHTLDxFbtyZgo2dLqo2Jo2vCaEQR3UVfRLKfca6yk6AATboZ9eISIpHOnANKlM0EqpCYa6Q/D/nnp1O9IZlPoDbXHCAccqpCex+TaqYpzWLxQl/E=
+umtgvei4u73rs7ln68jkihhuj35j9vks.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  vk76ip10hbt1sddodt9aeern75a4bdmk CNAME RRSIG 
+umtgvei4u73rs7ln68jkihhuj35j9vks.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. U583rWHOzu23MOXoKTqNONAyFJIO/YKY0qomPusCaoh2DZNqL7xkeBTNX1cogtnpFZg7XUYpjMumS/e6NWC8FkvaxVatlA6bMaYKyzvKjI+YcY+XJGhlyDb/Cpl9bedgw1kNS+n587twEURue1TRXZxV+O4ZbJr7uNHxTATk+eY=
+ittj2nn0t7alqb2ctmmngvjrbg1t3dl0.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  lvbglk21g5muda78co9hloo6688a8m10
+ittj2nn0t7alqb2ctmmngvjrbg1t3dl0.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. ySAsEnptQRUnhJl82Z4Pkknxh7QMVxjc0IzzB64MMCnOslgUsZn7aZLcIZGNA5tEck6bXW0/G/o0YWZrPQOoQNeo4tHQgySaLIkhxby++ST1zGnsfhWjrFzGjtU7JJIepTna5bO3hw9Q00cfKw9G/8z/pQv2sneOdbsgrXRWYd8=
+lvbglk21g5muda78co9hloo6688a8m10.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  mvte72h9hkjtqjn1ij1mlccva6pm1otg
+lvbglk21g5muda78co9hloo6688a8m10.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. vIEfBL8JrM1oRs/Rs30cYWBl+2Ysu2/anPba95UlmjXSqJUnyuiAaJyW4k7AKY6UEhESllUZeA/XsD60oJYXuT8pu9gAK5g9imP3rItunWBpse/exPHQnfdRAjtTVHjnqqIY/Mc510GTVR5J/mB1OnO1iwLeXWVgK+UEzrXywCA=
+a.b.ent.nsec3sha1.test.	3600	IN	A	192.0.2.50
+a.b.ent.nsec3sha1.test.	3600	IN	RRSIG	A 7 5 3600 20271001000000 20261001000000 32395 nsec3sha1.test. nmtUzBQTeqzi7jW1N8XdNHUkn7geGY0J0+j0EcNzqbRbrRSF6KogxGDce2O+mSxHleSyo+pdGUhV1hbZ2IG2DGKyS6ITlndCnj1mmPnRymTX5QhOjOEC9hIc/IHcgy9qJGubTBh+cEuwSWkiU2aJLzXGsWrmkQyldqdjtUFsN8o=
+gsdorc983lt1cjn0cv2a5bh4avo1cerq.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  ittj2nn0t7alqb2ctmmngvjrbg1t3dl0 A RRSIG 
+gsdorc983lt1cjn0cv2a5bh4avo1cerq.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. EeYUyZFF624v/lmU4tH3glg9fpMM+zA3aewgokok8Flxg+QLoM5Et5g2CWHISDQymtv1VkKmj2qIISplo7MxJrHBRDwWz7WgJtEm5/mRw5j40+J1qu9AWDWX5bXM0V3kXV6/YHMJdmyJ6ElrszRZ8cMZRAU9aU5wsx0YQ2uw4OM=
+mail.nsec3sha1.test.	3600	IN	A	192.0.2.25
+mail.nsec3sha1.test.	3600	IN	RRSIG	A 7 3 3600 20271001000000 20261001000000 32395 nsec3sha1.test. UhjNJPjtTNcBAxsanDcVavE+FlJWyeSl2ykXKdr0ROhCIsIRTzJh9X1aNzh4phn9+e5VoCkUfKUmzX97l3ujRU5KLPWhI9WQTw8jQ1S11qqN43wOuuQd3bV3bXtDedpVfcKm3fshmfme7jpdCTxtPUDfDwPR0o0GJQgQSbXqwNk=
+o3hq9es30l1tfkoiprbcqc2n5d7tak4i.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  ouccmb6t80qkugs0t18l2kkop0fckfo9 A RRSIG 
+o3hq9es30l1tfkoiprbcqc2n5d7tak4i.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. Joe6tWAX2u1HEdC2VXXETE49XuMSZdYcX8ReSiEKypr3yyXA9IDbdtqbNNGxoeXTCCkaGEeTQagfV5YMGDLb9HgOPAbSD2i9Sw3BZfdkVtozexsaXy6mdZbS3geFYlqnaH+TtV35kFg3AIDVLrQ5REGVctCepOcr0VRYlX5Emk8=
+ns1.nsec3sha1.test.	3600	IN	A	127.0.0.1
+ns1.nsec3sha1.test.	3600	IN	RRSIG	A 7 3 3600 20271001000000 20261001000000 32395 nsec3sha1.test. jIMi8nvx3bP7h5CNxjeTlTvtHIZfvSEPZuQ3wyUltXF9gIVgttDv6ZYF6s5KDcLJTQg7AJunlYosP+oAFYBFUGAOn25qum3OgV7r5N/CNOvugJjMGvCA9Kibjy4yna1bu9WE+VuoGVJZnYeWFkIY6ztJiA/9mZpYcx9bj60iKMI=
+ouccmb6t80qkugs0t18l2kkop0fckfo9.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  ql54ceta1akd33d1as3l6k1dp3ue586d A RRSIG 
+ouccmb6t80qkugs0t18l2kkop0fckfo9.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. X+liqHvhKCEd23i+X0jofLgzvLrJohufTjlrPg/VomUG7tH07Ec8odEVUT+xqNR6eLn4Ytqjyy9Ab06iA3LI9TQNEX03+UT808qbQq1RYqtzEBeg3k+9fQ5iPWdfyMjuJlm0vTMmsb6k1fIRILwpnyNlfTZU7E6dFHTyRWAI1lo=
+txt.nsec3sha1.test.	3600	IN	TXT	"zig-dnssec cross-check fixture"
+txt.nsec3sha1.test.	3600	IN	RRSIG	TXT 7 3 3600 20271001000000 20261001000000 32395 nsec3sha1.test. VonfSE7rjXiaHNGgq9DJVeF9nITvnQcNNZAd3vwUPo6mUAYfOZPNzGEfDBLwI1h/v0GyULz3Bj49KG1DbBg5F62ZUe8F7bQo9VLRkO8hu6iUD0YyBxe+Ukztrg7aSIcwrpX6AmE1oBUyzwbCK1FX3QMcsn8Gc4ZZt/7irhwGCGc=
+ql54ceta1akd33d1as3l6k1dp3ue586d.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  umtgvei4u73rs7ln68jkihhuj35j9vks TXT RRSIG 
+ql54ceta1akd33d1as3l6k1dp3ue586d.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. TbeBqFdxin6MvI9BtXAMmfPfkyRw1mj9S5jDMbDw/z0Odou8A8PdAbTIhwoedx/chrLO5rwlwH7Twvi7qXAfCL2yn6tN+ZzHc5j1VtcZiQ0KUcCy2RZ6KRaqE11HkrjYCmmtRXDWBMVctoUAkqCMuEgJdz7alIX1NT0GaiQA458=
+1tniagb4u7n65eqno33vju1sji7sg2lq.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  dl5qcrs0lvr5na4g9sllhih57rge6ied
+1tniagb4u7n65eqno33vju1sji7sg2lq.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. mxjQmZlnSdkcTeHG92Fmi+kvXa2ITF5tj3anSjm9jEOhhkJ0R/VTY3xjQiKVSwS6U6L8Cs8cG4jkhMLR80xhZjEH867f8/CBAQ5tEtY6AbWekoUhs6eTIgh8fRu8U9V7w6f38/TJvm6uiCsvJal0+aLIAqXwggaua87HsfxETDU=
+*.wild.nsec3sha1.test.	3600	IN	A	192.0.2.99
+*.wild.nsec3sha1.test.	3600	IN	RRSIG	A 7 3 3600 20271001000000 20261001000000 32395 nsec3sha1.test. YyorOFNPyPo7IyZLaRyUxy3/jaIu4vKwisFEeuW2ChARgFINKX75iVHWOnXSNrkhXk5U0ygVS2javjhi/zb6I3qJhdAm5exrc8AS9Xe0n8W+dUYM0p80nOa+AqTO+/td1YwAPp+T2sxk0xeYEzpSsWKjxiudRZ2BvtDPMK1MVYs=
+vk76ip10hbt1sddodt9aeern75a4bdmk.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  1tniagb4u7n65eqno33vju1sji7sg2lq A RRSIG 
+vk76ip10hbt1sddodt9aeern75a4bdmk.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. VuuQxyicpyN0gb1MCRVbSY/GWf94JUV4SAY75gp6lDeKw+vH8UxU0XXR3W8f/h4AJllpSBJ/SJCczAKXUyVFOcTZjSvmEFI8QeXYZBQKr6zFTgEvtSxfWUuHSmuWlOw/AfSIXWEwi+Amdp0j03/jb0P6M1jlx8uBjR51qT5Usgo=
+www.nsec3sha1.test.	3600	IN	A	192.0.2.1
+www.nsec3sha1.test.	3600	IN	RRSIG	A 7 3 3600 20271001000000 20261001000000 32395 nsec3sha1.test. WkrU0mnyfbcNoj+3mc5Ab8HKM7nRa0F+3iZB3mDCqh3XBoXYMSVGsgalkbUY7IP/n+yC4m+1reow/oB+zs686zqpjjgw0rAoWYKFAX3cwyw9/sOwK1jcmrR9NUILDeWGY9Hc2irZCPw3M7XbXAUgzP5QN6hXz/whDdWeo81IuZE=
+www.nsec3sha1.test.	3600	IN	AAAA	2001:db8::1
+www.nsec3sha1.test.	3600	IN	RRSIG	AAAA 7 3 3600 20271001000000 20261001000000 32395 nsec3sha1.test. UbhhGawpu9qA/wXeMViMBI0Ww6gd+NQKsr1YXkzfb+v0P5CPENkW2jSK9y614ttMxuoywyVHk96nSXrDCX/n8T7qTuVgcM3k/JGqWDt8e2FawvWAi5e/Fd+v7LEl/7wqkq/nPJYQ4hLm+Chl+ohdFhtgV+SJYK4+jn+zplNN+TI=
+dl5qcrs0lvr5na4g9sllhih57rge6ied.nsec3sha1.test.	300	IN	NSEC3	1 0 5 aabbccdd  gsdorc983lt1cjn0cv2a5bh4avo1cerq A AAAA RRSIG 
+dl5qcrs0lvr5na4g9sllhih57rge6ied.nsec3sha1.test.	300	IN	RRSIG	NSEC3 7 3 300 20271001000000 20261001000000 32395 nsec3sha1.test. RHS1BZBiJt2CqXcoMAJmiQpS0lFoSsypZKt23QNv3GhA6sdOg8Sf6WebNF92LlhN2/TOkhfVt79pZp9ormhpcTXyL/0DjkH+X/APEfIQGvnDvRgWS1KJld5a7MHcnCnwjKH/93odTN4aW+DYdR2V3ZKIhmma3LHZzddQ49usKJs=
