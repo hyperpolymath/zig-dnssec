@@ -13,7 +13,7 @@ const Name = wire_name.Name;
 
 /// RFC 4034 Appendix B key tag over complete DNSKEY RDATA.
 pub fn keyTag(dnskey_rdata: []const u8) u16 {
-    if (dnskey_rdata.len >= 4 and dnskey_rdata[3] == @intFromEnum(types.Algorithm.rsamd5)) {
+    if (dnskey_rdata.len >= 4 and dnskey_rdata[3] == @backingInt(types.Algorithm.rsamd5)) {
         // Appendix B.1: the most significant 16 of the least significant
         // 24 bits of the modulus.
         if (dnskey_rdata.len < 7) return 0;

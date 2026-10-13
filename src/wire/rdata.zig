@@ -279,7 +279,7 @@ pub const Dnskey = struct {
         return .{
             .flags = be16(rdata[0..]),
             .protocol = rdata[2],
-            .algorithm = @enumFromInt(rdata[3]),
+            .algorithm = @fromBackingInt(@intCast(rdata[3])),
             .public_key = rdata[4..],
         };
     }
@@ -303,8 +303,8 @@ pub const Ds = struct {
         if (rdata.len < 5) return error.MalformedRdata;
         const d: Ds = .{
             .key_tag = be16(rdata[0..]),
-            .algorithm = @enumFromInt(rdata[2]),
-            .digest_type = @enumFromInt(rdata[3]),
+            .algorithm = @fromBackingInt(@intCast(rdata[2])),
+            .digest_type = @fromBackingInt(@intCast(rdata[3])),
             .digest = rdata[4..],
         };
         if (digestLength(d.digest_type)) |len| {
@@ -349,8 +349,8 @@ pub const Rrsig = struct {
         };
         if (p >= rdata.len) return error.MalformedRdata; // empty signature
         return .{
-            .type_covered = @enumFromInt(be16(rdata[0..])),
-            .algorithm = @enumFromInt(rdata[2]),
+            .type_covered = @fromBackingInt(@intCast(be16(rdata[0..]))),
+            .algorithm = @fromBackingInt(@intCast(rdata[2])),
             .labels = rdata[3],
             .original_ttl = be32(rdata[4..]),
             .expiration = be32(rdata[8..]),
@@ -457,7 +457,7 @@ pub const Nsec3 = struct {
         if (p + hash_len > rdata.len) return error.MalformedRdata;
         const next = rdata[p..][0..hash_len];
         p += hash_len;
-        const ha: types.Nsec3HashAlgorithm = @enumFromInt(rdata[0]);
+        const ha: types.Nsec3HashAlgorithm = @fromBackingInt(@intCast(rdata[0]));
         if (ha == .sha1 and hash_len != 20) return error.MalformedRdata;
         return .{
             .hash_algorithm = ha,
@@ -486,7 +486,7 @@ pub const Nsec3Param = struct {
         const salt_len: usize = rdata[4];
         if (rdata.len != 5 + salt_len) return error.MalformedRdata;
         return .{
-            .hash_algorithm = @enumFromInt(rdata[0]),
+            .hash_algorithm = @fromBackingInt(@intCast(rdata[0])),
             .flags = rdata[1],
             .iterations = be16(rdata[2..]),
             .salt = rdata[5..],

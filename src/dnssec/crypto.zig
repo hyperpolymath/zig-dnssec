@@ -174,7 +174,7 @@ test "unsupported algorithms are reported, not accepted" {
     try testing.expectError(error.UnsupportedAlgorithm, verify(.rsamd5, &.{}, &.{}, &.{}));
     try testing.expectError(error.UnsupportedAlgorithm, verify(.dsa, &.{}, &.{}, &.{}));
     try testing.expectError(error.UnsupportedAlgorithm, verify(.ecc_gost, &.{}, &.{}, &.{}));
-    try testing.expectError(error.UnsupportedAlgorithm, verify(@enumFromInt(200), &.{}, &.{}, &.{}));
+    try testing.expectError(error.UnsupportedAlgorithm, verify(@fromBackingInt(@intCast(200)), &.{}, &.{}, &.{}));
 }
 
 test "Ed25519 round trip through std, and tamper detection" {

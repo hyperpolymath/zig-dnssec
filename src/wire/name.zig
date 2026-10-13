@@ -331,8 +331,8 @@ pub const Name = struct {
         const nb = b.labelOffsets(&ob);
         var k: usize = 0;
         while (k < na and k < nb) : (k += 1) {
-            const la = a.buf[oa[na - 1 - k] ..][0 .. 1 + @as(usize, a.buf[oa[na - 1 - k]])];
-            const lb = b.buf[ob[nb - 1 - k] ..][0 .. 1 + @as(usize, b.buf[ob[nb - 1 - k]])];
+            const la = a.buf[oa[na - 1 - k]..][0 .. 1 + @as(usize, a.buf[oa[na - 1 - k]])];
+            const lb = b.buf[ob[nb - 1 - k]..][0 .. 1 + @as(usize, b.buf[ob[nb - 1 - k]])];
             if (!std.ascii.eqlIgnoreCase(la, lb)) break;
         }
         return k;
@@ -436,9 +436,9 @@ test "fromText rejects malformed names" {
 test "RFC 4034 §6.1 canonical ordering example" {
     // The example list from RFC 4034 §6.1, already in canonical order.
     const names = [_][]const u8{
-        "example.",           "a.example.",          "yljkjljk.a.example.",
-        "Z.a.example.",       "zABC.a.EXAMPLE.",     "z.example.",
-        "\\001.z.example.",   "*.z.example.",        "\\200.z.example.",
+        "example.",         "a.example.",      "yljkjljk.a.example.",
+        "Z.a.example.",     "zABC.a.EXAMPLE.", "z.example.",
+        "\\001.z.example.", "*.z.example.",    "\\200.z.example.",
     };
     var parsed: [names.len]Name = undefined;
     for (names, 0..) |t, i| parsed[i] = try Name.fromText(t);
