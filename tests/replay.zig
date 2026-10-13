@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 
 //! Offline validator tests over responses recorded from NSD + Unbound by
-//! crosscheck/run.sh (tests/testdata/crosscheck.traces), plus targeted
+//! tests/crosscheck/run.sh (tests/testdata/crosscheck.traces), plus targeted
 //! negative tests made by mutating those recorded responses: tampered data,
 //! stripped signatures, a removed chain link, forged denial, time travel,
 //! wrong trust anchor, and resource limits.
@@ -362,7 +362,8 @@ test "negative: time travel, wrong trust anchor, no trust anchor, budgets, fetch
     {
         var r = try resolveWith(www.records, anchor_src, www.qname, .a, .{ .max_fetches = 1 }, now);
         defer r.deinit();
-        try testing.expect(r.verdict == .bogus or r.verdict == .indeterminate);
+        try testing.expect(r.verdict == .bogus);
+        try testing.expectEqual(validator.Reason.resource_limit, r.verdict.bogus.reason);
     }
     // A chain fetch that fails (record missing from the replay): indeterminate.
     {
