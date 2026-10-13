@@ -195,22 +195,22 @@ fn parseClass(t: []const u8) ?types.Class {
     if (std.ascii.eqlIgnoreCase(t, "HS")) return .hs;
     if (t.len > 5 and std.ascii.eqlIgnoreCase(t[0..5], "CLASS")) {
         const v = std.fmt.parseInt(u16, t[5..], 10) catch return null;
-        return @enumFromInt(v);
+        return @fromBackingInt(@intCast(v));
     }
     return null;
 }
 
 pub fn parseAlgorithm(t: []const u8) Error!types.Algorithm {
     if (t.len > 0 and std.ascii.isDigit(t[0])) {
-        return @enumFromInt(std.fmt.parseInt(u8, t, 10) catch return error.BadAlgorithm);
+        return @fromBackingInt(@intCast(std.fmt.parseInt(u8, t, 10) catch return error.BadAlgorithm));
     }
     const names = .{
-        .{ "RSAMD5", types.Algorithm.rsamd5 },            .{ "DSA", types.Algorithm.dsa },
-        .{ "RSASHA1", types.Algorithm.rsasha1 },          .{ "DSA-NSEC3-SHA1", types.Algorithm.dsa_nsec3_sha1 },
+        .{ "RSAMD5", types.Algorithm.rsamd5 },                         .{ "DSA", types.Algorithm.dsa },
+        .{ "RSASHA1", types.Algorithm.rsasha1 },                       .{ "DSA-NSEC3-SHA1", types.Algorithm.dsa_nsec3_sha1 },
         .{ "RSASHA1-NSEC3-SHA1", types.Algorithm.rsasha1_nsec3_sha1 }, .{ "RSASHA256", types.Algorithm.rsasha256 },
-        .{ "RSASHA512", types.Algorithm.rsasha512 },      .{ "ECC-GOST", types.Algorithm.ecc_gost },
-        .{ "ECDSAP256SHA256", types.Algorithm.ecdsap256sha256 }, .{ "ECDSAP384SHA384", types.Algorithm.ecdsap384sha384 },
-        .{ "ED25519", types.Algorithm.ed25519 },          .{ "ED448", types.Algorithm.ed448 },
+        .{ "RSASHA512", types.Algorithm.rsasha512 },                   .{ "ECC-GOST", types.Algorithm.ecc_gost },
+        .{ "ECDSAP256SHA256", types.Algorithm.ecdsap256sha256 },       .{ "ECDSAP384SHA384", types.Algorithm.ecdsap384sha384 },
+        .{ "ED25519", types.Algorithm.ed25519 },                       .{ "ED448", types.Algorithm.ed448 },
     };
     inline for (names) |n| {
         if (std.ascii.eqlIgnoreCase(t, n[0])) return n[1];
@@ -406,14 +406,14 @@ fn encodeRdata(a: std.mem.Allocator, t: Type, toks: []const Token, origin: ?*con
             try need.at(toks, 4);
             try w.u16be(try num(u16, toks[0].text));
             try w.byte(try num(u8, toks[1].text));
-            try w.byte(@intFromEnum(try parseAlgorithm(toks[2].text)));
+            try w.byte(@backingInt(try parseAlgorithm(toks[2].text)));
             const key = try encoding.base64Decode(a, try joined(a, toks[3..]));
             try w.bytes(key);
         },
         .ds, .cds => {
             try need.at(toks, 4);
             try w.u16be(try num(u16, toks[0].text));
-            try w.byte(@intFromEnum(try parseAlgorithm(toks[1].text)));
+            try w.byte(@backingInt(try parseAlgorithm(toks[1].text)));
             try w.byte(try num(u8, toks[2].text));
             const hex = try joined(a, toks[3..]);
             const out = try a.alloc(u8, hex.len / 2);
@@ -423,7 +423,7 @@ fn encodeRdata(a: std.mem.Allocator, t: Type, toks: []const Token, origin: ?*con
             try need.at(toks, 9);
             const covered = Type.fromMnemonic(toks[0].text) orelse return error.UnknownType;
             try w.u16be(covered.toInt());
-            try w.byte(@intFromEnum(try parseAlgorithm(toks[1].text)));
+            try w.byte(@backingInt(try parseAlgorithm(toks[1].text)));
             try w.byte(try num(u8, toks[2].text));
             try w.u32be(try parseTtl(toks[3].text));
             try w.u32be(try parseRrsigTime(toks[4].text));
@@ -542,15 +542,53 @@ pub fn formatRr(w: *std.Io.Writer, rr: *const Rr) std.Io.Writer.Error!void {
     const rd = rr.rdata;
     switch (rr.type) {
         .a => if (rd.len == 4) return w.print("{d}.{d}.{d}.{d}", .{ rd[0], rd[1], rd[2], rd[3] }),
+        .aaaa => if (rd.len == 16) {
+            const addr: std.Io.net.Ip6Address = .{ .bytes = rd[0..16].*, .port = 0 };
+            var b: [64]u8 = undefined;
+            var fw: std.Io.Writer = .fixed(&b);
+            addr.format(&fw) catch {};
+            const s = fw.buffered();
+            // Ip6Address formats as "[addr]:port"; keep the address only.
+            if (s.len > 2 and s[0] == '[') {
+                if (std.mem.findScalar(u8, s, ']')) |end| return w.writeAll(s[1..end]);
+            }
+        },
+        .mx => if (rd.len >= 3) {
+            if (Name.fromWire(rd[2..])) |n| {
+                try w.print("{d} ", .{std.mem.readInt(u16, rd[0..2], .big)});
+                return n.format(w);
+            } else |_| {}
+        },
+        .soa => if (rdata_mod.Soa.parse(rd)) |s| {
+            try s.mname.format(w);
+            try w.writeByte(' ');
+            try s.rname.format(w);
+            return w.print(" {d} {d} {d} {d} {d}", .{ s.serial, s.refresh, s.retry, s.expire, s.minimum });
+        } else |_| {},
+        .txt => {
+            var p: usize = 0;
+            while (p < rd.len) {
+                const l = rd[p];
+                if (p + 1 + l > rd.len) break;
+                if (p > 0) try w.writeByte(' ');
+                try w.writeByte('"');
+                for (rd[p + 1 ..][0..l]) |c| {
+                    if (c == '"' or c == '\\') try w.print("\\{c}", .{c}) else if (c >= 0x20 and c < 0x7F) try w.writeByte(c) else try w.print("\\{d:0>3}", .{c});
+                }
+                try w.writeByte('"');
+                p += 1 + l;
+            }
+            if (p == rd.len) return;
+        },
         .ns, .cname, .dname, .ptr => if (Name.fromWire(rd)) |n| return n.format(w) else |_| {},
         .ds => if (rdata_mod.Ds.parse(rd)) |d| {
-            return w.print("{d} {d} {d} {x}", .{ d.key_tag, @intFromEnum(d.algorithm), @intFromEnum(d.digest_type), d.digest });
+            return w.print("{d} {d} {d} {x}", .{ d.key_tag, @backingInt(d.algorithm), @backingInt(d.digest_type), d.digest });
         } else |_| {},
         .dnskey => if (rdata_mod.Dnskey.parse(rd)) |k| {
-            return w.print("{d} {d} {d} ({d}-octet key)", .{ k.flags, k.protocol, @intFromEnum(k.algorithm), k.public_key.len });
+            return w.print("{d} {d} {d} ({d}-octet key)", .{ k.flags, k.protocol, @backingInt(k.algorithm), k.public_key.len });
         } else |_| {},
         .rrsig => if (rdata_mod.Rrsig.parse(rd)) |s| {
-            try w.print("{s} {d} {d} {d} {d} {d} {d} ", .{ s.type_covered.mnemonic(&tb), @intFromEnum(s.algorithm), s.labels, s.original_ttl, s.expiration, s.inception, s.key_tag });
+            try w.print("{s} {d} {d} {d} {d} {d} {d} ", .{ s.type_covered.mnemonic(&tb), @backingInt(s.algorithm), s.labels, s.original_ttl, s.expiration, s.inception, s.key_tag });
             try s.signer.format(w);
             return w.writeAll(" (signature)");
         } else |_| {},
@@ -560,7 +598,7 @@ pub fn formatRr(w: *std.Io.Writer, rr: *const Rr) std.Io.Writer.Error!void {
         } else |_| {},
         .nsec3 => if (rdata_mod.Nsec3.parse(rd)) |n| {
             var b32: [512]u8 = undefined;
-            return w.print("{d} {d} {d} {x} {s} (types)", .{ @intFromEnum(n.hash_algorithm), n.flags, n.iterations, n.salt, encoding.base32HexEncode(&b32, n.next_hashed_owner) });
+            return w.print("{d} {d} {d} {x} {s} (types)", .{ @backingInt(n.hash_algorithm), n.flags, n.iterations, n.salt, encoding.base32HexEncode(&b32, n.next_hashed_owner) });
         } else |_| {},
         else => {},
     }

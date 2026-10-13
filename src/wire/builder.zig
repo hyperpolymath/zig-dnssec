@@ -47,7 +47,7 @@ pub const Builder = struct {
     }
 
     fn advance(b: *Builder, to: Stage) Error!void {
-        if (@intFromEnum(to) < @intFromEnum(b.stage)) return error.SectionOrder;
+        if (@backingInt(to) < @backingInt(b.stage)) return error.SectionOrder;
         b.stage = to;
     }
 
@@ -117,7 +117,7 @@ pub const Builder = struct {
             .additional => .additional,
         };
         try b.advance(stage);
-        const idx = @intFromEnum(stage);
+        const idx = @backingInt(stage);
         if (b.counts[idx] == std.math.maxInt(u16)) return error.NoSpace;
         try b.writeName(&rr.name, true);
         try b.put16(rr.type.toInt());

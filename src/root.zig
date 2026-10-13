@@ -11,6 +11,14 @@ pub const sec = struct {
     pub const rrset = @import("dnssec/rrset.zig");
     pub const nsec = @import("dnssec/nsec.zig");
     pub const nsec3 = @import("dnssec/nsec3.zig");
+    pub const anchors = @import("dnssec/anchors.zig");
+    pub const validator = @import("dnssec/validator.zig");
+};
+
+pub const stub = struct {
+    pub const transport = @import("stub/transport.zig");
+    pub const doh = @import("stub/doh.zig");
+    pub const client = @import("stub/client.zig");
 };
 
 pub const wire = struct {
@@ -44,4 +52,9 @@ test {
     _ = @import("dnssec/rrset.zig");
     _ = @import("dnssec/nsec.zig");
     _ = @import("dnssec/nsec3.zig");
+    _ = @import("dnssec/anchors.zig");
+    _ = @import("dnssec/validator.zig");
+    _ = @import("stub/transport.zig");
+    _ = @import("stub/doh.zig");
+    _ = @import("stub/client.zig");
 }

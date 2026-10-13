@@ -48,7 +48,7 @@ pub const Flags = struct {
     pub fn fromInt(v: u16) Flags {
         return .{
             .qr = v & 0x8000 != 0,
-            .opcode = @enumFromInt(@as(u4, @truncate(v >> 11))),
+            .opcode = @fromBackingInt(@intCast(@as(u4, @truncate(v >> 11)))),
             .aa = v & 0x0400 != 0,
             .tc = v & 0x0200 != 0,
             .rd = v & 0x0100 != 0,
@@ -63,7 +63,7 @@ pub const Flags = struct {
     pub fn toInt(f: Flags) u16 {
         var v: u16 = 0;
         if (f.qr) v |= 0x8000;
-        v |= @as(u16, @intFromEnum(f.opcode)) << 11;
+        v |= @as(u16, @backingInt(f.opcode)) << 11;
         if (f.aa) v |= 0x0400;
         if (f.tc) v |= 0x0200;
         if (f.rd) v |= 0x0100;
@@ -140,7 +140,7 @@ pub const Message = struct {
     /// Full 12-bit RCODE (header RCODE plus the EDNS extended bits).
     pub fn rcode(m: *const Message) types.Rcode {
         const hi: u12 = if (m.edns) |e| @as(u12, e.extended_rcode_high) << 4 else 0;
-        return @enumFromInt(hi | m.header.flags.rcode);
+        return @fromBackingInt(@intCast(hi | m.header.flags.rcode));
     }
 
     pub fn section(m: *const Message, s: Section) []Rr {
@@ -173,8 +173,8 @@ pub const Message = struct {
             if (pos + 4 > bytes.len) return error.Truncated;
             q.* = .{
                 .name = n,
-                .qtype = @enumFromInt(std.mem.readInt(u16, bytes[pos..][0..2], .big)),
-                .qclass = @enumFromInt(std.mem.readInt(u16, bytes[pos + 2 ..][0..2], .big)),
+                .qtype = @fromBackingInt(@intCast(std.mem.readInt(u16, bytes[pos..][0..2], .big))),
+                .qclass = @fromBackingInt(@intCast(std.mem.readInt(u16, bytes[pos + 2 ..][0..2], .big))),
             };
             pos += 4;
         }
@@ -221,8 +221,8 @@ fn readRr(a: std.mem.Allocator, bytes: []const u8, pos: *usize, section: Section
     const owner = try Name.readFromMessage(bytes, pos);
     if (pos.* + 10 > bytes.len) return error.Truncated;
     const f = bytes[pos.*..][0..10];
-    const t: Type = @enumFromInt(std.mem.readInt(u16, f[0..2], .big));
-    const class: Class = @enumFromInt(std.mem.readInt(u16, f[2..4], .big));
+    const t: Type = @fromBackingInt(@intCast(std.mem.readInt(u16, f[0..2], .big)));
+    const class: Class = @fromBackingInt(@intCast(std.mem.readInt(u16, f[2..4], .big)));
     const ttl = std.mem.readInt(u32, f[4..8], .big);
     const rdlen: usize = std.mem.readInt(u16, f[8..10], .big);
     pos.* += 10;

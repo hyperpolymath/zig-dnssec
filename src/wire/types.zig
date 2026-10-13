@@ -58,11 +58,11 @@ pub const Type = enum(u16) {
     _,
 
     pub fn fromInt(v: u16) Type {
-        return @enumFromInt(v);
+        return @fromBackingInt(@intCast(v));
     }
 
     pub fn toInt(t: Type) u16 {
-        return @intFromEnum(t);
+        return @backingInt(t);
     }
 
     /// Meta-types and QTYPE-only values (RFC 6895 §3.1) never appear as data.
@@ -77,7 +77,7 @@ pub const Type = enum(u16) {
             const n = @min(buf.len, tag.len);
             return std.ascii.upperString(buf[0..n], tag[0..n]);
         }
-        return std.fmt.bufPrint(buf, "TYPE{d}", .{@intFromEnum(t)}) catch buf[0..0];
+        return std.fmt.bufPrint(buf, "TYPE{d}", .{@backingInt(t)}) catch buf[0..0];
     }
 
     pub fn fromMnemonic(text: []const u8) ?Type {
@@ -87,7 +87,7 @@ pub const Type = enum(u16) {
         }
         if (text.len > 4 and std.ascii.eqlIgnoreCase(text[0..4], "TYPE")) {
             const v = std.fmt.parseInt(u16, text[4..], 10) catch return null;
-            return @enumFromInt(v);
+            return @fromBackingInt(@intCast(v));
         }
         return null;
     }
@@ -102,7 +102,7 @@ pub const Class = enum(u16) {
     _,
 
     pub fn toInt(c: Class) u16 {
-        return @intFromEnum(c);
+        return @backingInt(c);
     }
 };
 
