@@ -419,7 +419,7 @@ const Session = struct {
 
         const m = switch (try s.fetch(zone, .ds)) {
             .ok => |m| m,
-            .err => |f| return .{ .indeterminate = f },
+            .err => |f| return failureToKey(f),
         };
         const ans = try rrset_mod.group(s.a, m.answer);
         const auth = try rrset_mod.group(s.a, m.authority);
@@ -612,7 +612,11 @@ const Session = struct {
 
             const m = switch (try s.fetch(x, .ds)) {
                 .ok => |m| m,
-                .err => |f| return .{ .indeterminate = f },
+                .err => |f| return switch (failureToKey(f)) {
+                    .bogus => |ff| .{ .bogus = ff },
+                    .indeterminate => |ff| .{ .indeterminate = ff },
+                    else => unreachable,
+                },
             };
             const ans = try rrset_mod.group(s.a, m.answer);
             const auth = try rrset_mod.group(s.a, m.authority);
