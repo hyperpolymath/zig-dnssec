@@ -75,7 +75,10 @@ pub const Name = struct {
             switch (b & 0xC0) {
                 0x00 => {
                     const l: usize = b;
-                    if (out.len + 1 + l > max_wire_len) return error.NameTooLong;
+                    // Computed in usize: `out.len` is a u8. A non-root label must
+                    // leave room for the terminating root label.
+                    const new_len = @as(usize, out.len) + 1 + l;
+                    if (new_len > max_wire_len or (l != 0 and new_len == max_wire_len)) return error.NameTooLong;
                     if (p + 1 + l > data.len) return error.Truncated;
                     out.buf[out.len] = b;
                     @memcpy(out.buf[out.len + 1 ..][0..l], data[p + 1 ..][0..l]);
@@ -109,7 +112,10 @@ pub const Name = struct {
             switch (b & 0xC0) {
                 0x00 => {
                     const l: usize = b;
-                    if (out.len + 1 + l > max_wire_len) return error.NameTooLong;
+                    // Computed in usize: `out.len` is a u8. A non-root label must
+                    // leave room for the terminating root label.
+                    const new_len = @as(usize, out.len) + 1 + l;
+                    if (new_len > max_wire_len or (l != 0 and new_len == max_wire_len)) return error.NameTooLong;
                     if (p + 1 + l > msg.len) return error.Truncated;
                     out.buf[out.len] = b;
                     @memcpy(out.buf[out.len + 1 ..][0..l], msg[p + 1 ..][0..l]);
@@ -576,4 +582,31 @@ test "compressed name longer than 255 octets is rejected" {
 
 fn rep(comptime c: u8, comptime n: usize) [n]u8 {
     return @splat(c);
+}
+
+test "regression (fuzzer): labels reaching exactly 255 octets without a root label" {
+    // 3*64 + 62 = 254 octets of labels; one more label would make 256 with
+    // the root: NameTooLong, never an integer overflow of the u8 length.
+    var msg: [12 + 300]u8 = @splat(0);
+    var p: usize = 12;
+    for (0..3) |_| {
+        msg[p] = 63;
+        @memset(msg[p + 1 .. p + 64], 'a');
+        p += 64;
+    }
+    msg[p] = 61;
+    @memset(msg[p + 1 .. p + 62], 'b');
+    p += 62; // 254 octets of labels so far, no root yet
+    msg[p] = 1;
+    msg[p + 1] = 'c';
+    msg[p + 2] = 0;
+    var pos: usize = 12;
+    try testing.expectError(error.NameTooLong, Name.readFromMessage(&msg, &pos));
+    pos = 12;
+    try testing.expectError(error.NameTooLong, Name.readUncompressed(&msg, &pos));
+    // 254 octets of labels + root = 255: the maximum, accepted.
+    msg[p] = 0;
+    pos = 12;
+    const n = try Name.readFromMessage(&msg, &pos);
+    try testing.expectEqual(@as(u8, 255), n.len);
 }
