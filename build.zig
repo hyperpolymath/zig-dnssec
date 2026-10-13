@@ -25,4 +25,12 @@ pub fn build(b: *std.Build) void {
         .imports = &.{.{ .name = "dnssec", .module = mod }},
     }) });
     test_step.dependOn(&b.addRunArtifact(vectors).step);
+
+    const denial = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("tests/denial.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "dnssec", .module = mod }},
+    }) });
+    test_step.dependOn(&b.addRunArtifact(denial).step);
 }
