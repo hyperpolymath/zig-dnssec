@@ -1,3 +1,6 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= Src Logic
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= C ABI implementation
+
+`main.zig` exports the functions declared in `../include/zig_dnssec.h`, each checked at
+compile time against the header's type.

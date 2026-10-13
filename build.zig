@@ -90,4 +90,82 @@ pub fn build(b: *std.Build) void {
     });
     const fuzz_install = b.addInstallArtifact(fuzz_exe, .{});
     b.step("fuzz-tool", "Build the standalone mutation fuzzer (use -Doptimize=ReleaseSafe)").dependOn(&fuzz_install.step);
+
+    // ---- C ABI seam (src/interface/) ---------------------------------------
+    // The header is the contract: translate-c turns it into the module the
+    // Zig implementation is type-checked against.
+    const header_path = b.path("src/interface/ffi/include/zig_dnssec.h");
+    const header_mod = b.addTranslateC(.{
+        .root_source_file = header_path,
+        .target = target,
+        .optimize = optimize,
+        .link_libc = false,
+    }).createModule();
+
+    const ffi_static = b.addLibrary(.{
+        .name = "zig_dnssec",
+        .linkage = .static,
+        .root_module = ffiModule(b, target, optimize, mod, header_mod, null),
+    });
+    const ffi_shared = b.addLibrary(.{
+        .name = "zig_dnssec",
+        .linkage = .dynamic,
+        .root_module = ffiModule(b, target, optimize, mod, header_mod, true),
+    });
+    const ffi_step = b.step("ffi", "Build the C ABI (static and shared libzig_dnssec) and install the header");
+    ffi_step.dependOn(&b.addInstallArtifact(ffi_static, .{}).step);
+    ffi_step.dependOn(&b.addInstallArtifact(ffi_shared, .{}).step);
+    ffi_step.dependOn(&b.addInstallFileWithDir(header_path, .header, "zig_dnssec.h").step);
+
+    // C-ABI behaviour: calls through the header's declarations into the
+    // library, plus allocator-checked calls of the same code.
+    const ffi_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("src/interface/ffi/test/abi_test.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "ffi", .module = ffiModule(b, target, optimize, mod, header_mod, null) },
+            .{ .name = "zig_dnssec_h", .module = header_mod },
+            .{ .name = "dnssec", .module = mod },
+        },
+    }) });
+    ffi_tests.root_module.addAnonymousImport("crosscheck.traces", .{ .root_source_file = b.path("tests/testdata/crosscheck.traces") });
+    ffi_tests.root_module.addAnonymousImport("crosscheck-root.anchor", .{ .root_source_file = b.path("tests/testdata/crosscheck-root.anchor") });
+    test_step.dependOn(&b.addRunArtifact(ffi_tests).step);
+
+    // The Idris2 model and the header must agree: codes, names and layout.
+    const seam_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("src/interface/ffi/test/seam_test.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "ffi", .module = ffiModule(b, target, optimize, mod, header_mod, null) },
+            .{ .name = "zig_dnssec_h", .module = header_mod },
+            .{ .name = "dnssec", .module = mod },
+        },
+    }) });
+    seam_tests.root_module.addAnonymousImport("Types.idr", .{ .root_source_file = b.path("src/interface/Abi/Types.idr") });
+    seam_tests.root_module.addAnonymousImport("Layout.idr", .{ .root_source_file = b.path("src/interface/Abi/Layout.idr") });
+    seam_tests.root_module.addAnonymousImport("Foreign.idr", .{ .root_source_file = b.path("src/interface/Abi/Foreign.idr") });
+    test_step.dependOn(&b.addRunArtifact(seam_tests).step);
+}
+
+fn ffiModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    dnssec: *std.Build.Module,
+    header: *std.Build.Module,
+    pic: ?bool,
+) *std.Build.Module {
+    return b.createModule(.{
+        .root_source_file = b.path("src/interface/ffi/src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .pic = pic,
+        .imports = &.{
+            .{ .name = "dnssec", .module = dnssec },
+            .{ .name = "zig_dnssec_h", .module = header },
+        },
+    });
 }

@@ -4,8 +4,8 @@
 
 == Current status
 
-Experimental. The first milestone (codec, DNSSEC validation, DoH stub) is complete and
-tested, and has *not* been independently reviewed. See
+Experimental. Milestone 1 (codec, DNSSEC validation, DoH stub) and milestone 2 (the C
+ABI seam) are complete and tested, and have *not* been independently reviewed. See
 `docs/reports/VERIFICATION.adoc` for what is and is not verified.
 
 == Milestone 1 — codec, validator, DoH stub (done, 2026-10-13)
@@ -19,6 +19,15 @@ tested, and has *not* been independently reviewed. See
 * [x] Cross-check against Unbound and ldns on a fixed zone set
 * [x] CI workflow running the tests
 
+== Milestone 2 — C ABI seam (done, 2026-10-13)
+
+* [x] C header as the contract (`src/interface/ffi/include/zig_dnssec.h`), version 1
+* [x] Pure-Zig implementation, type-checked against the header at compile time
+* [x] Idris2 model: codes with round-trip proofs, verdict layout proofs, and a result
+      type that cannot carry an answer for a bogus or indeterminate verdict
+* [x] Tests keeping header, Zig and Idris2 in step; C-ABI behaviour tests
+* [x] Idris2 -> C ABI -> Zig end-to-end test, in CI
+
 == Next
 
 . *Independent review* of the validator, the proof logic, the parsers and the DoH
@@ -28,16 +37,14 @@ tested, and has *not* been independently reviewed. See
   on prompts, as the template's onboarding docs warn; a table cell lost to placeholder
   deletion; references to the template's own issues renamed by the global
   substitution; REPOSITORY-MAP.adoc and the coaptation receipt left stale; the
-  ABI/FFI seam below); add a Zig-library archetype so `build.zig` and
-  `build.zig.zon` are expected at the root.
-. Specialise the ABI/FFI seam in `src/interface/`. As minted it is the template's
-  generic example, not wired to this library: the Zig side does not compile on
-  Zig 0.17.0 (`Allocator.dupeZ` is gone), its `Result` enum differs from the Idris2
-  one, and the two sides name different symbols (`rsr_*` against `zig_dnssec_*`).
-  The replacement: an Idris2 model of the verdict at the seam, stating "no answer
-  data without secure or proven-insecure evidence" as a type (estate
-  epistemic-types work), and a Zig C ABI over the validator, with tests that keep
-  the two sides in step.
+  template's example ABI/FFI seam, which does not build on Zig 0.17.0 and whose
+  Idris2 and Zig sides disagree on result codes and symbol names); add a
+  Zig-library archetype so `build.zig` and `build.zig.zon` are expected at the root.
+. A live transport for Idris2 callers: a DNS-over-HTTPS entry point in the C ABI, or
+  an Idris2 callback for `zig_dnssec_validate`.
+. A model of the validator's decision procedure in which "secure" can only be built
+  from verified signatures up to an anchor (`docs/reports/VERIFICATION.adoc`, estate
+  note).
 
 == Later
 

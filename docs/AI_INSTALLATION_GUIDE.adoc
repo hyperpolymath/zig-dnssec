@@ -34,6 +34,8 @@ cd zig-dnssec
 === 3. Install the toolchain
 
 The toolchain is pinned in `mise.toml` / `mise.lock` (Zig 0.17.0, just, shellcheck).
+Idris2 0.7.0, which checks the ABI model in `src/interface/Abi/`, is not a mise tool:
+it comes from pack or a source build (`just doctor` reports whether it is present).
 
 [source,bash]
 ----
@@ -48,7 +50,9 @@ SHA-256 against `mise.lock` (or its minisign signature) before use.
 
 [source,bash]
 ----
-zig build test --summary all            # unit, RFC-vector, denial, replay, fuzz-corpus tests
+zig build test --summary all            # unit, RFC-vector, denial, replay, fuzz-corpus, C ABI tests
+just test                               # the above plus the Idris2 typecheck
+just abi-e2e                            # Idris2 -> C ABI -> Zig end to end
 zig build -Doptimize=ReleaseSafe        # library + dnssec-stub
 just validate                           # repository-standard checks
 ----

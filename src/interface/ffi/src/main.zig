@@ -1,275 +1,350 @@
 // SPDX-License-Identifier: MPL-2.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-// ZIG_DNSSEC FFI Implementation
-//
-// This module implements the C-compatible FFI declared in src/abi/Foreign.idr
-// All types and layouts must match the Idris2 ABI definitions.
-//
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+
+//! zig-dnssec C ABI, version 1: the Zig side of the seam.
+//!
+//! The contract is `src/interface/ffi/include/zig_dnssec.h`. This file does
+//! not restate it: the verdict struct *is* the header's struct (through
+//! translate-c), every exported function is checked at compile time to have
+//! exactly the type the header declares, and every code is taken from the
+//! header's macros by name, so a reason added to the validator without a
+//! header macro does not compile.
+//!
+//! Experimental and unreviewed, like the library.
 
 const std = @import("std");
+const lib = @import("dnssec");
+pub const h = @import("zig_dnssec_h");
 
-// Version information (keep in sync with project)
-const VERSION = "0.1.0";
-const BUILD_INFO = "ZIG_DNSSEC built with Zig " ++ @import("builtin").zig_version_string;
+const Allocator = std.mem.Allocator;
+const validator = lib.sec.validator;
+const TrustAnchors = lib.sec.anchors.TrustAnchors;
+const transport = lib.stub.transport;
+const StubClient = lib.stub.client.StubClient;
+const Name = lib.wire.Name;
+const Type = lib.wire.Type;
 
-/// Thread-local error storage
-threadlocal var last_error: ?[]const u8 = null;
+pub const Verdict = h.zig_dnssec_verdict;
 
-/// Set the last error message
-fn setError(msg: []const u8) void {
-    last_error = msg;
-}
-
-/// Clear the last error
-fn clearError() void {
-    last_error = null;
-}
-
-//==============================================================================
-// Core Types (must match src/abi/Types.idr)
-//==============================================================================
-
-/// Result codes (must match Idris2 Result type)
-pub const Result = enum(c_int) {
-    ok = 0,
-    @"error" = 1,
-    invalid_param = 2,
-    out_of_memory = 3,
-    null_pointer = 4,
+/// Call status, valued from the header.
+pub const Status = enum(c_int) {
+    ok = h.ZIG_DNSSEC_OK,
+    invalid_argument = h.ZIG_DNSSEC_ERR_INVALID_ARGUMENT,
+    out_of_memory = h.ZIG_DNSSEC_ERR_OUT_OF_MEMORY,
+    bad_anchors = h.ZIG_DNSSEC_ERR_BAD_ANCHORS,
+    bad_name = h.ZIG_DNSSEC_ERR_BAD_NAME,
+    bad_trace = h.ZIG_DNSSEC_ERR_BAD_TRACE,
+    query_failed = h.ZIG_DNSSEC_ERR_QUERY_FAILED,
+    buffer_too_small = h.ZIG_DNSSEC_ERR_BUFFER_TOO_SMALL,
 };
 
-/// Library handle. C sees only a pointer, so the fields stay private to Zig.
-pub const Handle = struct {
-    // Internal state hidden from C
-    allocator: std.mem.Allocator,
-    initialized: bool,
-    // Add your fields here
+/// verdict.security, valued from the header. `none` is 0 so that a zeroed
+/// verdict never reads as secure.
+pub const Security = enum(u8) {
+    none = h.ZIG_DNSSEC_SECURITY_NONE,
+    secure = h.ZIG_DNSSEC_SECURITY_SECURE,
+    insecure = h.ZIG_DNSSEC_SECURITY_INSECURE,
+    bogus = h.ZIG_DNSSEC_SECURITY_BOGUS,
+    indeterminate = h.ZIG_DNSSEC_SECURITY_INDETERMINATE,
 };
 
-//==============================================================================
-// Library Lifecycle
-//==============================================================================
+pub const policy_mask: u32 = h.ZIG_DNSSEC_POLICY_UNSUPPORTED_INSECURE |
+    h.ZIG_DNSSEC_POLICY_ITERATIONS_INSECURE |
+    h.ZIG_DNSSEC_POLICY_NO_SHA1;
 
-/// Initialize the library
-/// Returns a handle, or null on failure
-export fn zig_dnssec_init() ?*Handle {
-    const allocator = std.heap.c_allocator;
-
-    const handle = allocator.create(Handle) catch {
-        setError("Failed to allocate handle");
-        return null;
-    };
-
-    // Initialize handle
-    handle.* = .{
-        .allocator = allocator,
-        .initialized = true,
-    };
-
-    clearError();
-    return handle;
+fn upperComptime(comptime s: []const u8) [s.len]u8 {
+    @setEvalBranchQuota(10_000);
+    var out: [s.len]u8 = undefined;
+    for (s, 0..) |c, i| out[i] = std.ascii.toUpper(c);
+    return out;
 }
 
-/// Free the library handle
-export fn zig_dnssec_free(handle: ?*Handle) void {
-    const h = handle orelse return;
-    const allocator = h.allocator;
-
-    // Clean up resources
-    h.initialized = false;
-
-    allocator.destroy(h);
-    clearError();
+/// The header macro that carries the code of reason `r`.
+pub fn reasonMacro(comptime r: validator.Reason) []const u8 {
+    return "ZIG_DNSSEC_REASON_" ++ upperComptime(@tagName(r));
 }
 
-//==============================================================================
-// Core Operations
-//==============================================================================
+/// The reason code of `r`, read from the header macro of the same name.
+pub fn reasonCode(r: validator.Reason) u8 {
+    @setEvalBranchQuota(100_000);
+    switch (r) {
+        inline else => |tag| return @field(h, reasonMacro(tag)),
+    }
+}
 
-/// Process data (example operation)
-export fn zig_dnssec_process(handle: ?*Handle, input: u32) Result {
-    const h = handle orelse {
-        setError("Null handle");
-        return .null_pointer;
+/// Reason names by code; index 0 is "none".
+const reason_names: [std.enums.values(validator.Reason).len + 1][*:0]const u8 = blk: {
+    @setEvalBranchQuota(100_000);
+    var t: [std.enums.values(validator.Reason).len + 1][*:0]const u8 = undefined;
+    for (&t) |*e| e.* = "unknown";
+    t[h.ZIG_DNSSEC_REASON_NONE] = "none";
+    for (std.enums.values(validator.Reason)) |r| {
+        const code = @field(h, reasonMacro(r));
+        if (code >= t.len) @compileError("reason codes must be dense: " ++ reasonMacro(r));
+        if (!std.mem.eql(u8, std.mem.span(t[code]), "unknown")) @compileError("duplicate reason code: " ++ reasonMacro(r));
+        t[code] = @tagName(r);
+    }
+    break :blk t;
+};
+
+// ---------------------------------------------------------------------------
+// Core, allocator-parametric (the tests run it under the leak checker)
+// ---------------------------------------------------------------------------
+
+pub const Request = struct {
+    anchors: ?[*:0]const u8,
+    qname: ?[*:0]const u8,
+    qtype: u16,
+    now: i64,
+    policy: u32,
+    out: ?*Verdict,
+    text: ?[*]u8,
+    text_cap: usize,
+};
+
+/// Runs one validation over `t` and fills the verdict. Keeps the header's
+/// fail-closed rules: `security` stays NONE unless the result is OK, and
+/// answer text is produced only for SECURE and INSECURE.
+pub fn run(gpa: Allocator, t: transport.Transport, req: Request) Status {
+    const out = req.out orelse return .invalid_argument;
+    out.* = std.mem.zeroes(Verdict);
+    if (req.text) |p| {
+        if (req.text_cap > 0) p[0] = 0;
+    }
+    if (req.policy & ~policy_mask != 0) return .invalid_argument;
+    const qname_z = req.qname orelse return .invalid_argument;
+    const qtype = Type.fromInt(req.qtype);
+    if (req.qtype == 0 or qtype.isMetaOrQtype()) return .invalid_argument;
+    const qname = Name.fromText(std.mem.span(qname_z)) catch return .bad_name;
+
+    var anchors = if (req.anchors) |a|
+        TrustAnchors.fromText(gpa, std.mem.span(a)) catch |e| return switch (e) {
+            error.OutOfMemory => .out_of_memory,
+            else => .bad_anchors,
+        }
+    else
+        TrustAnchors.ianaRoot(gpa) catch |e| return switch (e) {
+            error.OutOfMemory => .out_of_memory,
+            else => .bad_anchors,
+        };
+    defer anchors.deinit();
+    if (anchors.anchors.len == 0) return .bad_anchors;
+
+    var policy: validator.Policy = .{};
+    if (req.policy & h.ZIG_DNSSEC_POLICY_UNSUPPORTED_INSECURE != 0) policy.unsupported_algorithm = .insecure;
+    if (req.policy & h.ZIG_DNSSEC_POLICY_ITERATIONS_INSECURE != 0) policy.nsec3_iterations = .insecure;
+    if (req.policy & h.ZIG_DNSSEC_POLICY_NO_SHA1 != 0) policy.allow_sha1 = false;
+
+    var client: StubClient = .{ .transport = t, .anchors = &anchors, .policy = policy };
+    var result = client.resolve(gpa, qname, qtype, req.now) catch |e| return switch (e) {
+        error.OutOfMemory => .out_of_memory,
+        else => .query_failed,
     };
+    defer result.deinit();
 
-    if (!h.initialized) {
-        setError("Handle not initialized");
-        return .@"error";
+    // Only the SECURE and INSECURE arms carry an answer; the failure arms
+    // have no path to answer data.
+    const answer: ?*const validator.Answer = switch (result.verdict) {
+        .secure => |*ans| ans,
+        .insecure => |*ins| &ins.answer,
+        .bogus, .indeterminate => null,
+    };
+    var text: std.Io.Writer.Allocating = .init(gpa);
+    defer text.deinit();
+    if (answer) |ans| writeAnswer(&text.writer, ans) catch return .out_of_memory;
+    const body = text.written();
+    const body_len = std.math.cast(u32, body.len) orelse return .out_of_memory;
+
+    if (req.text) |p| {
+        if (req.text_cap < body.len + 1) {
+            out.text_len = body_len;
+            return .buffer_too_small;
+        }
+        @memcpy(p[0..body.len], body);
+        p[body.len] = 0;
     }
 
-    // Example processing logic
-    _ = input;
-
-    clearError();
+    out.text_len = body_len;
+    out.fetches = result.stats.fetches;
+    out.verifications = result.stats.verifications;
+    switch (result.verdict) {
+        .secure => |ans| {
+            out.security = @backingInt(Security.secure);
+            out.rcode = @backingInt(ans.rcode);
+            out.ttl = ans.ttl;
+        },
+        .insecure => |ins| {
+            out.security = @backingInt(Security.insecure);
+            out.reason = reasonCode(ins.reason);
+            out.rcode = @backingInt(ins.answer.rcode);
+            out.ttl = ins.answer.ttl;
+            setWhere(out, &ins.zone);
+        },
+        .bogus, .indeterminate => |f| {
+            out.security = @backingInt(if (result.verdict == .bogus) Security.bogus else Security.indeterminate);
+            out.reason = reasonCode(f.reason);
+            out.rtype = f.rtype.toInt();
+            setWhere(out, &f.name);
+        },
+    }
     return .ok;
 }
 
-//==============================================================================
-// String Operations
-//==============================================================================
+fn setWhere(out: *Verdict, n: *const Name) void {
+    const buf: []u8 = out.where[0 .. out.where.len - 1];
+    const s = n.toText(buf);
+    out.where[s.len] = 0;
+}
 
-/// Get a string result (example)
-/// Caller must free the returned string
-export fn zig_dnssec_get_string(handle: ?*Handle) ?[*:0]const u8 {
-    const h = handle orelse {
-        setError("Null handle");
-        return null;
-    };
+fn writeAnswer(w: *std.Io.Writer, ans: *const validator.Answer) !void {
+    for (ans.rrsets) |set| {
+        for (set.rdatas) |rd| {
+            const rr: lib.wire.Rr = .{ .name = set.name, .type = set.type, .class = set.class, .ttl = set.ttl, .rdata = rd };
+            try lib.wire.text.formatRr(w, &rr);
+            try w.writeByte('\n');
+        }
+    }
+}
 
-    if (!h.initialized) {
-        setError("Handle not initialized");
-        return null;
+/// Transport over a caller-supplied C callback.
+pub const CallbackTransport = struct {
+    exchange: h.zig_dnssec_exchange_fn,
+    ctx: ?*anyopaque,
+
+    pub fn asTransport(self: *CallbackTransport) transport.Transport {
+        return .{ .ptr = self, .exchangeFn = exchangeImpl };
     }
 
-    // Example: allocate and return a string
-    const result = h.allocator.dupeZ(u8, "Example result") catch {
-        setError("Failed to allocate string");
-        return null;
-    };
-
-    clearError();
-    return result.ptr;
-}
-
-/// Free a string allocated by the library
-export fn zig_dnssec_free_string(str: ?[*:0]const u8) void {
-    const s = str orelse return;
-    const allocator = std.heap.c_allocator;
-
-    const slice = std.mem.span(s);
-    allocator.free(slice);
-}
-
-//==============================================================================
-// Array/Buffer Operations
-//==============================================================================
-
-/// Process an array of data
-export fn zig_dnssec_process_array(
-    handle: ?*Handle,
-    buffer: ?[*]const u8,
-    len: u32,
-) Result {
-    const h = handle orelse {
-        setError("Null handle");
-        return .null_pointer;
-    };
-
-    const buf = buffer orelse {
-        setError("Null buffer");
-        return .null_pointer;
-    };
-
-    if (!h.initialized) {
-        setError("Handle not initialized");
-        return .@"error";
+    fn exchangeImpl(ptr: *anyopaque, gpa: Allocator, query: []u8) anyerror![]u8 {
+        const self: *CallbackTransport = @ptrCast(@alignCast(ptr));
+        const f = self.exchange orelse return error.ExchangeFailed;
+        const buf = try gpa.alloc(u8, 65535);
+        errdefer gpa.free(buf);
+        var len: usize = 0;
+        if (f(self.ctx, query.ptr, query.len, buf.ptr, buf.len, &len) != 0) return error.ExchangeFailed;
+        if (len > buf.len) return error.ExchangeFailed;
+        return gpa.realloc(buf, len);
     }
+};
 
-    // Access the buffer
-    const data = buf[0..len];
-    _ = data;
-
-    // Process data here
-
-    clearError();
-    return .ok;
-}
-
-//==============================================================================
-// Error Handling
-//==============================================================================
-
-/// Get the last error message
-/// Returns null if no error
-export fn zig_dnssec_last_error() ?[*:0]const u8 {
-    const err = last_error orelse return null;
-
-    // Return C string (static storage, no need to free)
-    const allocator = std.heap.c_allocator;
-    const c_str = allocator.dupeZ(u8, err) catch return null;
-    return c_str.ptr;
-}
-
-//==============================================================================
-// Version Information
-//==============================================================================
-
-/// Get the library version
-export fn zig_dnssec_version() [*:0]const u8 {
-    return VERSION.ptr;
-}
-
-/// Get build information
-export fn zig_dnssec_build_info() [*:0]const u8 {
-    return BUILD_INFO.ptr;
-}
-
-//==============================================================================
-// Callback Support
-//==============================================================================
-
-/// Callback function type (C ABI)
-pub const Callback = *const fn (u64, u32) callconv(.c) u32;
-
-/// Register a callback
-export fn zig_dnssec_register_callback(
-    handle: ?*Handle,
-    callback: ?Callback,
-) Result {
-    const h = handle orelse {
-        setError("Null handle");
-        return .null_pointer;
-    };
-
-    const cb = callback orelse {
-        setError("Null callback");
-        return .null_pointer;
-    };
-
-    if (!h.initialized) {
-        setError("Handle not initialized");
-        return .@"error";
+pub fn validateWith(
+    gpa: Allocator,
+    exchange: h.zig_dnssec_exchange_fn,
+    ctx: ?*anyopaque,
+    req: Request,
+) Status {
+    if (exchange == null) {
+        if (req.out) |o| o.* = std.mem.zeroes(Verdict);
+        return .invalid_argument;
     }
-
-    // Store callback for later use
-    _ = cb;
-
-    clearError();
-    return .ok;
+    var cb: CallbackTransport = .{ .exchange = exchange, .ctx = ctx };
+    return run(gpa, cb.asTransport(), req);
 }
 
-//==============================================================================
-// Utility Functions
-//==============================================================================
-
-/// Check if handle is initialized
-export fn zig_dnssec_is_initialized(handle: ?*Handle) u32 {
-    const h = handle orelse return 0;
-    return if (h.initialized) 1 else 0;
+pub fn validateTraceWith(gpa: Allocator, trace: ?[*:0]const u8, req: Request) Status {
+    const tz = trace orelse {
+        if (req.out) |o| o.* = std.mem.zeroes(Verdict);
+        return .invalid_argument;
+    };
+    if (req.out == null) return .invalid_argument;
+    var tr = transport.Trace.parse(gpa, std.mem.span(tz)) catch |e| {
+        req.out.?.* = std.mem.zeroes(Verdict);
+        return switch (e) {
+            error.OutOfMemory => .out_of_memory,
+            else => .bad_trace,
+        };
+    };
+    defer tr.deinit();
+    var replay: transport.ReplayTransport = .{ .records = tr.records };
+    return run(gpa, replay.transport(), req);
 }
 
-//==============================================================================
-// Tests
-//==============================================================================
+// ---------------------------------------------------------------------------
+// Exported C functions
+// ---------------------------------------------------------------------------
 
-test "lifecycle" {
-    const handle = zig_dnssec_init() orelse return error.InitFailed;
-    defer zig_dnssec_free(handle);
+const c_allocator = std.heap.smp_allocator;
 
-    try std.testing.expect(zig_dnssec_is_initialized(handle) == 1);
+fn abiVersion() callconv(.c) u32 {
+    return h.ZIG_DNSSEC_ABI_VERSION;
 }
 
-test "error handling" {
-    const result = zig_dnssec_process(null, 0);
-    try std.testing.expectEqual(Result.null_pointer, result);
-
-    const err = zig_dnssec_last_error();
-    try std.testing.expect(err != null);
+fn validateC(
+    exchange: h.zig_dnssec_exchange_fn,
+    ctx: ?*anyopaque,
+    anchors: [*c]const u8,
+    qname: [*c]const u8,
+    qtype: u16,
+    now: i64,
+    policy: u32,
+    out: [*c]Verdict,
+    text: [*c]u8,
+    text_cap: usize,
+) callconv(.c) c_int {
+    return @backingInt(validateWith(c_allocator, exchange, ctx, .{
+        .anchors = @ptrCast(anchors),
+        .qname = @ptrCast(qname),
+        .qtype = qtype,
+        .now = now,
+        .policy = policy,
+        .out = out,
+        .text = text,
+        .text_cap = text_cap,
+    }));
 }
 
-test "version" {
-    const ver = zig_dnssec_version();
-    const ver_str = std.mem.span(ver);
-    try std.testing.expectEqualStrings(VERSION, ver_str);
+fn validateTraceC(
+    trace: [*c]const u8,
+    anchors: [*c]const u8,
+    qname: [*c]const u8,
+    qtype: u16,
+    now: i64,
+    policy: u32,
+    out: [*c]Verdict,
+    text: [*c]u8,
+    text_cap: usize,
+) callconv(.c) c_int {
+    return @backingInt(validateTraceWith(c_allocator, @ptrCast(trace), .{
+        .anchors = @ptrCast(anchors),
+        .qname = @ptrCast(qname),
+        .qtype = qtype,
+        .now = now,
+        .policy = policy,
+        .out = out,
+        .text = text,
+        .text_cap = text_cap,
+    }));
+}
+
+fn statusName(status: c_int) callconv(.c) [*c]const u8 {
+    const s = std.enums.fromInt(Status, status) orelse return "unknown";
+    return @tagName(s);
+}
+
+fn securityName(security: u8) callconv(.c) [*c]const u8 {
+    const s = std.enums.fromInt(Security, security) orelse return "unknown";
+    return @tagName(s);
+}
+
+fn reasonName(reason: u8) callconv(.c) [*c]const u8 {
+    if (reason >= reason_names.len) return "unknown";
+    return reason_names[reason];
+}
+
+/// Exports each function under its header name after checking that its type
+/// is exactly the type the header declares.
+fn exportChecked(comptime f: anytype, comptime name: []const u8) void {
+    if (@TypeOf(f) != @TypeOf(@field(h, name)))
+        @compileError(name ++ ": implementation type " ++ @typeName(@TypeOf(f)) ++
+            " differs from the header's " ++ @typeName(@TypeOf(@field(h, name))));
+    @export(&f, .{ .name = name });
+}
+
+comptime {
+    exportChecked(abiVersion, "zig_dnssec_abi_version");
+    exportChecked(validateC, "zig_dnssec_validate");
+    exportChecked(validateTraceC, "zig_dnssec_validate_trace");
+    exportChecked(statusName, "zig_dnssec_status_name");
+    exportChecked(securityName, "zig_dnssec_security_name");
+    exportChecked(reasonName, "zig_dnssec_reason_name");
 }
