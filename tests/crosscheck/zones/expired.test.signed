@@ -1,0 +1,40 @@
+expired.test.	3600	IN	SOA	ns1.expired.test. hostmaster.expired.test. 2026101301 3600 900 1209600 300
+expired.test.	3600	IN	RRSIG	SOA 13 2 3600 20260901000000 20260801000000 7257 expired.test. XaysNOFF1a0heWSJjGjMUxnyp8rGrZYSPAxGizF04nRLUa3ZSN/TCuSXiyWmoU8dBvPIyjcPc2tvBnoH2mQwLA==
+expired.test.	3600	IN	NS	ns1.expired.test.
+expired.test.	3600	IN	RRSIG	NS 13 2 3600 20260901000000 20260801000000 7257 expired.test. vLba+1oyuQTju/vSubMVAuKL4aCBUoUBg/Kq67uWVHkbR0xxY3gq9PZd7Z6phMe9kKGFTigomXkTFoqivf43gQ==
+expired.test.	3600	IN	MX	10 mail.expired.test.
+expired.test.	3600	IN	RRSIG	MX 13 2 3600 20260901000000 20260801000000 7257 expired.test. y6Pg0h/DFhMMHxMMMQqN6CTWBI6GMYrJch0PAsF0Ajsc3kPWP5uB4ifMrid9vTO0vkQBqQsvzJrZHBFGMUNHjg==
+expired.test.	3600	IN	DNSKEY	257 3 13 CqRcehX2bp4BZmdG7B32AOpltLmTfCceBbllJ9FEAgNxQag7r2KkQHetpyE010xPSJuruPkc9ZLaVpATnlRREQ== ;{id = 7257 (ksk), size = 256b}
+expired.test.	3600	IN	RRSIG	DNSKEY 13 2 3600 20260901000000 20260801000000 7257 expired.test. hfBlM83lShxNR0sG9coaRzrb177yQPUPs1DkzFmfZ/akm9vphvbNcy1iZ4X6v0iJ22FoowNnvMbUjSM4INIO8A==
+expired.test.	300	IN	NSEC	alias.expired.test. NS SOA MX RRSIG NSEC DNSKEY 
+expired.test.	300	IN	RRSIG	NSEC 13 2 300 20260901000000 20260801000000 7257 expired.test. MMHRoDq+eQSxcApxUL9tI0GjDhVOAwXWW5Hpkpk6Vw+HjCA2r5U7g5W2/A66NXufgTt/X+tqDnZFEQ0X74sVZQ==
+alias.expired.test.	3600	IN	CNAME	www.expired.test.
+alias.expired.test.	3600	IN	RRSIG	CNAME 13 3 3600 20260901000000 20260801000000 7257 expired.test. ckfEp31PS6gnGqvcIt6BpAS7+Do0+UuuXOHz+zs4rEA03u60QTO7PS3uEVA9boZZm3ZsgTwO+EAHwzJccyW1TQ==
+alias.expired.test.	300	IN	NSEC	a.b.ent.expired.test. CNAME RRSIG NSEC 
+alias.expired.test.	300	IN	RRSIG	NSEC 13 3 300 20260901000000 20260801000000 7257 expired.test. XANybhZWrUnyK7zI4C/X1SBK84JCndBR3fCNNczXaCUYjTRuaMk+PHboq8QYpbmNQYkwNAS2ruBOyHEtUiFn1g==
+a.b.ent.expired.test.	3600	IN	A	192.0.2.50
+a.b.ent.expired.test.	3600	IN	RRSIG	A 13 5 3600 20260901000000 20260801000000 7257 expired.test. bTLFJ+4DMkpHPpSQsp1bXUsAzfbMifp1l4vnyMDeKNv15GQN/7ozbQi5EeLGNLPAfTjfChcD25lpH7dL3JV8Aw==
+a.b.ent.expired.test.	300	IN	NSEC	mail.expired.test. A RRSIG NSEC 
+a.b.ent.expired.test.	300	IN	RRSIG	NSEC 13 5 300 20260901000000 20260801000000 7257 expired.test. h80RUwS1gGJKQFG6fZRwqvQBpQGpvSm59uKka84QgIFf7va9mdVsRscArSKRbM4Ead9xa+hXKeI4NoPb3HC8Yw==
+mail.expired.test.	3600	IN	A	192.0.2.25
+mail.expired.test.	3600	IN	RRSIG	A 13 3 3600 20260901000000 20260801000000 7257 expired.test. y8AOkslzjKv+JNCxuXiJWwurMX8MmRVBCgfccQUKfBvGcbyC6YnHPn09uagMI78gHoWMCwfEAk/O9GFD3wzczA==
+mail.expired.test.	300	IN	NSEC	ns1.expired.test. A RRSIG NSEC 
+mail.expired.test.	300	IN	RRSIG	NSEC 13 3 300 20260901000000 20260801000000 7257 expired.test. pWXmMPzs91go/Gb+gkO6wdsiRorgmwnjFAqN74WI3mP//ODHI96tJq5tkZB07rFCl7uV/3K/gJqEiE+JD2reJg==
+ns1.expired.test.	3600	IN	A	127.0.0.1
+ns1.expired.test.	3600	IN	RRSIG	A 13 3 3600 20260901000000 20260801000000 7257 expired.test. srUSuK2GnERm26VKIZshlCLP34+aFqyvhsjrVBJelr3BvISE5eoMsjA9TPDNRz+OQmxiAKnaMJwWZvXEdZLTjA==
+ns1.expired.test.	300	IN	NSEC	txt.expired.test. A RRSIG NSEC 
+ns1.expired.test.	300	IN	RRSIG	NSEC 13 3 300 20260901000000 20260801000000 7257 expired.test. +RVyA+m+ue4xK1+SBGfJKKBZVorMQNCap182aq0CxPrfbMTf5L9gn8GiCQQ4grhr3kg6aeMoZTpkPB5cE+l2rw==
+txt.expired.test.	3600	IN	TXT	"zig-dnssec cross-check fixture"
+txt.expired.test.	3600	IN	RRSIG	TXT 13 3 3600 20260901000000 20260801000000 7257 expired.test. wVn4KTNZhk0usjTWLiCvTF5unY6iJHxfqachoUbcuMXkNvmU3VjfaX0lTzGBvwmADYBZ86ClB9Ro7FHN7OJkZw==
+txt.expired.test.	300	IN	NSEC	*.wild.expired.test. TXT RRSIG NSEC 
+txt.expired.test.	300	IN	RRSIG	NSEC 13 3 300 20260901000000 20260801000000 7257 expired.test. s9grr5bRH2A86RhHvXfC80ikBcI7Uk6kXrnGuqxzNbb2CLpXV5NBqAqgVIbMhkLCVlySf/b3kmFsoK7SXdw6jw==
+*.wild.expired.test.	3600	IN	A	192.0.2.99
+*.wild.expired.test.	3600	IN	RRSIG	A 13 3 3600 20260901000000 20260801000000 7257 expired.test. EGygNf0miOM6jHXJYk5k2w+jMapInUs8DkZQM5pagH/ElrZGGSz+Ah/sj3G3/Nj+iloyjbGqPffyIM1U/snLIg==
+*.wild.expired.test.	300	IN	NSEC	www.expired.test. A RRSIG NSEC 
+*.wild.expired.test.	300	IN	RRSIG	NSEC 13 3 300 20260901000000 20260801000000 7257 expired.test. 7cHop4xdGnsNv+Q6EIZQmBmTMdZeyyAiiSC3y123U5l3hYAtpHJN08osOw8Ex6evRsoLcDa8ndF7y2nYgJ+ssw==
+www.expired.test.	3600	IN	A	192.0.2.1
+www.expired.test.	3600	IN	RRSIG	A 13 3 3600 20260901000000 20260801000000 7257 expired.test. 4I+PIYTi2f2YCdNTDmlcZVg2lr9hJO3gZusc3fuqz0pM1lyQ3cfT5ED2m+m2cc8pac5sF/8ENZXeBSxfpNwS2w==
+www.expired.test.	3600	IN	AAAA	2001:db8::1
+www.expired.test.	3600	IN	RRSIG	AAAA 13 3 3600 20260901000000 20260801000000 7257 expired.test. XcwvfOXwS3JcjP/uVWjQQNp9UBGHxcDg/17g9r7yX0A4pDPHNRrHLipH96imrhvjvpI282HDfaXBg52K3N9YXg==
+www.expired.test.	300	IN	NSEC	expired.test. A AAAA RRSIG NSEC 
+www.expired.test.	300	IN	RRSIG	NSEC 13 3 300 20260901000000 20260801000000 7257 expired.test. W6Rqynl5W7k6twbtS+fZba990EPZIEY9SNbcx9gk4Rb56EVbu58FwRVoPMaQX3mTeIQiBEZq97jPkLf7j09FKw==

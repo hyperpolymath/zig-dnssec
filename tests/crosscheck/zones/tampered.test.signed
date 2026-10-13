@@ -1,0 +1,40 @@
+tampered.test.	3600	IN	SOA	ns1.tampered.test. hostmaster.tampered.test. 2026101301 3600 900 1209600 300
+tampered.test.	3600	IN	RRSIG	SOA 13 2 3600 20271001000000 20261001000000 34091 tampered.test. TGxFTtEmqyRBNEBIlLcPMrRLl6M1dF5XgUZa6iAZV71QHoyIOWzBSc76pIentsWKtElrielItnnkqA+i73rpaA==
+tampered.test.	3600	IN	NS	ns1.tampered.test.
+tampered.test.	3600	IN	RRSIG	NS 13 2 3600 20271001000000 20261001000000 34091 tampered.test. k4jxQxroqd5kl5pXAvimUx6La3a6gx4iTqVtui82/BiMWVRBhZxxMx1Wp7WNPzqYW8Kz7a36AV9beClCuWNGcQ==
+tampered.test.	3600	IN	MX	10 mail.tampered.test.
+tampered.test.	3600	IN	RRSIG	MX 13 2 3600 20271001000000 20261001000000 34091 tampered.test. 7Gb0XxaEWL1KnuJnc7lcZa5OltZY+PRSLlQHgKP1bAsXdr+EsDPVbUws4jPPUTyaFxWoiJIporeEh8HiF7o6/g==
+tampered.test.	3600	IN	DNSKEY	257 3 13 +kR7mGjIuVYF0fLfWFd0ucoMHksZARzpbjo348xVx1KIlPZ67aHeJn8kaMhzPrfaa/3hTb88S0XQJclSB610hQ== ;{id = 34091 (ksk), size = 256b}
+tampered.test.	3600	IN	RRSIG	DNSKEY 13 2 3600 20271001000000 20261001000000 34091 tampered.test. 6BXLEg3GHr3BqU6QW3FkBFbUBmv51/UBCgKg74FdeBo11z0HRzCPJvk+DLzRHph9GNPW34Ph8S7Vxw6lYlsAZQ==
+tampered.test.	300	IN	NSEC	alias.tampered.test. NS SOA MX RRSIG NSEC DNSKEY 
+tampered.test.	300	IN	RRSIG	NSEC 13 2 300 20271001000000 20261001000000 34091 tampered.test. oKwPrar/vTT35Stdd8SD53zEQXKF/2SkDWiwGGNj0AsE4FRXeLaNmlRZKwbQjKQbMrE1Mr0luPYZpY+oo3jtiw==
+alias.tampered.test.	3600	IN	CNAME	www.tampered.test.
+alias.tampered.test.	3600	IN	RRSIG	CNAME 13 3 3600 20271001000000 20261001000000 34091 tampered.test. +bmB6qgLidWPkEljgs5eqHki1OyIe6GBD5TYKitpVmezX2KA+iQcs4hq9n9LVURMy/hz5iaW03sDrk3R+a9FoA==
+alias.tampered.test.	300	IN	NSEC	a.b.ent.tampered.test. CNAME RRSIG NSEC 
+alias.tampered.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 34091 tampered.test. IWrs8B43XBtuNUI6HVhAM4SzBnE81axCE5NjoafeED5B93+2Dl/rN1rsxoBj0ukdeQZCJba7JI2aLvg8QIXbNg==
+a.b.ent.tampered.test.	3600	IN	A	192.0.2.50
+a.b.ent.tampered.test.	3600	IN	RRSIG	A 13 5 3600 20271001000000 20261001000000 34091 tampered.test. vUKQbxm0YqPFBBsyjKHZc4BvUT/Y6gYi9y3iEaEmkXwSKWN7p7OtEWmfgjGL5O/EZFKb1snBgV7eWWcS6v6jDQ==
+a.b.ent.tampered.test.	300	IN	NSEC	mail.tampered.test. A RRSIG NSEC 
+a.b.ent.tampered.test.	300	IN	RRSIG	NSEC 13 5 300 20271001000000 20261001000000 34091 tampered.test. yXnd70uLQwneAl9wc8glkpyfvOezKl7jPGfQN42/T9sLCAb6PcndQzyEh7MGKFLchxHFxJoPtCZec11CmuTTag==
+mail.tampered.test.	3600	IN	A	192.0.2.25
+mail.tampered.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 34091 tampered.test. N8+hQoWvUQpXwpuItXQt+WGQQhwBETP1Iw2UKKtsoDuDbBWNFNXQ0eoS0ugS0+gS9iQabKp/8HcgKvQHIIirrg==
+mail.tampered.test.	300	IN	NSEC	ns1.tampered.test. A RRSIG NSEC 
+mail.tampered.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 34091 tampered.test. sBUX81ueIzWsEAaH6xVo5O2bOcjXSwIgHxsSxwFkxnSb/GajDKPI6MZy2q8ESaaPxb2OHp30ie2GRfuIc3NY/Q==
+ns1.tampered.test.	3600	IN	A	127.0.0.1
+ns1.tampered.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 34091 tampered.test. 5tLAbGRBf1gnXkyPVCkfmDLMSHg+XiCXlxgsL+Gt04lYEHXbcfNN2kBUUMTI2kxqatYioSOUIW4wXSC1iDs8SQ==
+ns1.tampered.test.	300	IN	NSEC	txt.tampered.test. A RRSIG NSEC 
+ns1.tampered.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 34091 tampered.test. 6hqljeKpbuu9Q+KQ4iy472Pf10WAwsIiQZSN1Ej0eAEtOukeLVh6GG/OcicFWdmXYWKjkyplM43bFL1f3ijOTg==
+txt.tampered.test.	3600	IN	TXT	"zig-dnssec cross-check fixture"
+txt.tampered.test.	3600	IN	RRSIG	TXT 13 3 3600 20271001000000 20261001000000 34091 tampered.test. peOEoBjAa3maPCHKctnJMYlA67IkqoBiaOUIOkYu7vGo4zNSpMfxpmn/74iC8TrG/c0LDSax+e8rVR2yNB103g==
+txt.tampered.test.	300	IN	NSEC	*.wild.tampered.test. TXT RRSIG NSEC 
+txt.tampered.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 34091 tampered.test. H3NdXEFzLdEjcd1DW+rWneCWD18WZLMrX0wFx2TkbM7Kyo3L2xMUapuLNCdHNCFzeFsvs/I2FkVkqVLFFoX3NQ==
+*.wild.tampered.test.	3600	IN	A	192.0.2.99
+*.wild.tampered.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 34091 tampered.test. 15XgU47VkupOVXllh2H9oIHsu4fVDSZQ2U8h3MqHEIXJ1bg9ACXgt8CzTaZKuVjb3UEJMiRRiuIO54iR8DdBZw==
+*.wild.tampered.test.	300	IN	NSEC	www.tampered.test. A RRSIG NSEC 
+*.wild.tampered.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 34091 tampered.test. /+dJaowpXqXzZN8eHkWYnYtph8qgXUtPG/tybDcFFKKmUdwIa+F4COFvDNmP11BJLYDOyjqT4pvwjL8mVWLtxg==
+www.tampered.test.	3600	IN	A	192.0.2.66
+www.tampered.test.	3600	IN	RRSIG	A 13 3 3600 20271001000000 20261001000000 34091 tampered.test. QL/TB1gwvFHtNokYMEsQMWYsycIq8GBK7kpcv7NhqsI/Jyrwfr0UeS8XeQlQPFhzATjoOhmXWXiIZXeOdd6ciA==
+www.tampered.test.	3600	IN	AAAA	2001:db8::1
+www.tampered.test.	3600	IN	RRSIG	AAAA 13 3 3600 20271001000000 20261001000000 34091 tampered.test. 9WfefXxF1vkUET1gyKBYk/ySvUl7kTdPzTFqkGUBwEzWITOE3Kjqeypm14MVFkLTK5uTqtMA8mvfZOsIl4auxA==
+www.tampered.test.	300	IN	NSEC	tampered.test. A AAAA RRSIG NSEC 
+www.tampered.test.	300	IN	RRSIG	NSEC 13 3 300 20271001000000 20261001000000 34091 tampered.test. j5teCQnnB5KA1WuC02JJQPynQLac8/tUjy3pirq9AfaLTW1nyRbzbhEXrdF+4Wxj33bmlP+yxXp8PBpW8KbOLg==

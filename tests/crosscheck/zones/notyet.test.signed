@@ -1,0 +1,40 @@
+notyet.test.	3600	IN	SOA	ns1.notyet.test. hostmaster.notyet.test. 2026101301 3600 900 1209600 300
+notyet.test.	3600	IN	RRSIG	SOA 13 2 3600 20310101000000 20300101000000 39394 notyet.test. 2kZiLhdG2m5oPBOtnBd1iQzsyoqwVjcdOxHvVGhh+E9mlUlVOg5nSPx1cKQ4l/CeYrpd6qO/fX/lVQ18Lucthg==
+notyet.test.	3600	IN	NS	ns1.notyet.test.
+notyet.test.	3600	IN	RRSIG	NS 13 2 3600 20310101000000 20300101000000 39394 notyet.test. 8VFRmfDLplvcHESgDHVqy/209lykNFJB0vWfaEdID401iFAnIaC+5WHlpfnXctNo0az4LiPNBL7dwpJNQTeMww==
+notyet.test.	3600	IN	MX	10 mail.notyet.test.
+notyet.test.	3600	IN	RRSIG	MX 13 2 3600 20310101000000 20300101000000 39394 notyet.test. gIMY8PmfRgC7XXb8eAgk9TuoQHPTLqwwkFpYy9vF0z0A9NWfyVyXOMBsLN8x4HIZw61Y3ZZoVPNChiNQiMl0rg==
+notyet.test.	3600	IN	DNSKEY	257 3 13 QPeulS/bVMXWS0g5j91VZ8mMxexRPwdfwWYDobexI9R3krxYikbEwEFytvAD4xm4s4fV52VyBKTxONXE3fJj0A== ;{id = 39394 (ksk), size = 256b}
+notyet.test.	3600	IN	RRSIG	DNSKEY 13 2 3600 20310101000000 20300101000000 39394 notyet.test. 06oo/Z9ZBiiyoag1vlTISLmM3RSSgG/PlNpRtJoZKDgKqeOO2BZEdWA4rG5g+jPyvzFcRsNs4cFm99yWXtl6PQ==
+notyet.test.	300	IN	NSEC	alias.notyet.test. NS SOA MX RRSIG NSEC DNSKEY 
+notyet.test.	300	IN	RRSIG	NSEC 13 2 300 20310101000000 20300101000000 39394 notyet.test. CEcx9oeGOSFxZJvVqlI8DxGxHmCmCdgb07k3QXGDurGRnqK/jWCTWrRmLFgE5k8brL++uTLIqkL5MsLKZy4d2A==
+alias.notyet.test.	3600	IN	CNAME	www.notyet.test.
+alias.notyet.test.	3600	IN	RRSIG	CNAME 13 3 3600 20310101000000 20300101000000 39394 notyet.test. a50hmIRmEV2iqOuh93Lhl6/2LgPFbMTmiR3WWYGOTVmLUvZtnubkxP04q7/0ErQLbajtAVegZHkqes3P2mi2tQ==
+alias.notyet.test.	300	IN	NSEC	a.b.ent.notyet.test. CNAME RRSIG NSEC 
+alias.notyet.test.	300	IN	RRSIG	NSEC 13 3 300 20310101000000 20300101000000 39394 notyet.test. cuYPXF6wn7J8izblLI/AH1U+sYTKr/Zg/OwA4xBZjuWvlhkgHjBWql0xizB4+nOlcwOMLKiWeSsUbqTUUJTWrQ==
+a.b.ent.notyet.test.	3600	IN	A	192.0.2.50
+a.b.ent.notyet.test.	3600	IN	RRSIG	A 13 5 3600 20310101000000 20300101000000 39394 notyet.test. 7fKmzRn+WVBn/1qhUmLKrz87MMF3Vs4DTkYkcDA9a+P2slhqsxdJLk09XrJfnoMbB+hVPDbEQTfui0xAINfoXA==
+a.b.ent.notyet.test.	300	IN	NSEC	mail.notyet.test. A RRSIG NSEC 
+a.b.ent.notyet.test.	300	IN	RRSIG	NSEC 13 5 300 20310101000000 20300101000000 39394 notyet.test. U6xd1aMyf5AQIhHr6diEyuvJEkzMdKNGE+2kNFmeQj2PVSJPDzX5qIH+EjlN8R1fJ0lIoOFO/halPcJmdGMpZw==
+mail.notyet.test.	3600	IN	A	192.0.2.25
+mail.notyet.test.	3600	IN	RRSIG	A 13 3 3600 20310101000000 20300101000000 39394 notyet.test. vKoU4xiQ+Nd1hNINWRrdU9KE+su5yeTKCQgn6D6ZSyd7F3a+Pezj61KgQ46ShniZbMkn9lAQ0BjAHaQz04DwOA==
+mail.notyet.test.	300	IN	NSEC	ns1.notyet.test. A RRSIG NSEC 
+mail.notyet.test.	300	IN	RRSIG	NSEC 13 3 300 20310101000000 20300101000000 39394 notyet.test. +ZYfMgFDxHRm69yxP7rRzp69QUXhhVwLHc/ZGn1iGmWN3jgEzrLVYznySNgRQv1DWjDgIkwnQtC7/ZhQkVO5eQ==
+ns1.notyet.test.	3600	IN	A	127.0.0.1
+ns1.notyet.test.	3600	IN	RRSIG	A 13 3 3600 20310101000000 20300101000000 39394 notyet.test. JY/VaFWZEznPEKHXXg/uLiUb5pcz/c0lZXPDe+qY4Pc1BBGnSg1F2sTINgW3gYmrv3ooL+qG2VTAbgBRqiVn5w==
+ns1.notyet.test.	300	IN	NSEC	txt.notyet.test. A RRSIG NSEC 
+ns1.notyet.test.	300	IN	RRSIG	NSEC 13 3 300 20310101000000 20300101000000 39394 notyet.test. Pl8oNU19rgmjfwpIOljIRhkQ+/ekZM+21rjIkbuVlcwAWjVuhWrUsKZyBxFxSEYiUS4RtaZ+3G9tpeShXqBtuw==
+txt.notyet.test.	3600	IN	TXT	"zig-dnssec cross-check fixture"
+txt.notyet.test.	3600	IN	RRSIG	TXT 13 3 3600 20310101000000 20300101000000 39394 notyet.test. fb7tLj2yTBm7ffdIbSRlPTF9LzlNq5iydKI0Gp8jJlFzGKWWOgZXJa10eByQpxF2lO2PKzz0B7M6yYMbYXyRZA==
+txt.notyet.test.	300	IN	NSEC	*.wild.notyet.test. TXT RRSIG NSEC 
+txt.notyet.test.	300	IN	RRSIG	NSEC 13 3 300 20310101000000 20300101000000 39394 notyet.test. Ln74n1+DfzPn2W+o/OqMrmffs0OgcFxe3tgux42o1DoAKB7KC3oogZ8WsgOen44YuqxbbTMQbjlZeTu7IIF/GA==
+*.wild.notyet.test.	3600	IN	A	192.0.2.99
+*.wild.notyet.test.	3600	IN	RRSIG	A 13 3 3600 20310101000000 20300101000000 39394 notyet.test. ENsGbmBqmVraFRvI+NiHeogM6LbqsVMa8e6V5YMEC7yI/7AsEltm6hinwTWBW45VYsTLhmsbIkUSST+Xv/acew==
+*.wild.notyet.test.	300	IN	NSEC	www.notyet.test. A RRSIG NSEC 
+*.wild.notyet.test.	300	IN	RRSIG	NSEC 13 3 300 20310101000000 20300101000000 39394 notyet.test. rmm0SwGFAK46qSNTwmOMJmup3zSRLPRVkFYMX72i9OyK3fz8vpJxNBTEyWxzh7w7P5abUFSJoLxda/2n/ed7yA==
+www.notyet.test.	3600	IN	A	192.0.2.1
+www.notyet.test.	3600	IN	RRSIG	A 13 3 3600 20310101000000 20300101000000 39394 notyet.test. ll+aEPlUdQsiUVCE3aswaJwpEZdbLACgLFnQvCNaGOwMNzQIZzdB7V3XcTEosLeqw7BzKvfwELXGTl86l9meKw==
+www.notyet.test.	3600	IN	AAAA	2001:db8::1
+www.notyet.test.	3600	IN	RRSIG	AAAA 13 3 3600 20310101000000 20300101000000 39394 notyet.test. U0TRuQs7uI2Xr3No4XpSlQryVITZhiXNsOr4NZvP0UdvynZPgWtXRoaGhulo/ivSVAFGyABp2AkXhy0WUap8HA==
+www.notyet.test.	300	IN	NSEC	notyet.test. A AAAA RRSIG NSEC 
+www.notyet.test.	300	IN	RRSIG	NSEC 13 3 300 20310101000000 20300101000000 39394 notyet.test. uBIlOzpLK5bu6jcIyCpgyZcCrGvkX/6NrKK2MSajxSbI9V1IAjta7TyXUKCvbUptmcE19nHukHxaRsivoO9jkg==

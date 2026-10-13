@@ -1,0 +1,13 @@
+$ORIGIN insecure.test.
+$TTL 3600
+@     SOA ns1.insecure.test. hostmaster.insecure.test. 2026101301 3600 900 1209600 300
+@     NS  ns1.insecure.test.
+@     MX  10 mail.insecure.test.
+ns1   A   127.0.0.1
+www   A   192.0.2.1
+www   AAAA 2001:db8::1
+mail  A   192.0.2.25
+txt   TXT "zig-dnssec cross-check fixture"
+alias CNAME www.insecure.test.
+*.wild A  192.0.2.99
+a.b.ent A 192.0.2.50
