@@ -144,3 +144,12 @@ verification/proofs/coq/.*.aux
 # Agda compiled proof artifacts
 verification/proofs/agda/*.agdai
 
+
+# Zig
+.zig-cache/
+zig-out/
+
+# zig-dnssec cross-check: local server state, and test signing keys that
+# tests/crosscheck/make-zones.sh generates (only signed zones are a fixture)
+/tests/crosscheck/work/
+/tests/crosscheck/keys/

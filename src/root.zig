@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MPL-2.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+
+//! zig-dnssec — an experimental, pure-Zig DNS wire-format codec and DNSSEC
+//! validator with a DoH stub client. See README.md: this code has not been
+//! independently reviewed and must not be relied on for security decisions.
+
+pub const wire = struct {
+    pub const name = @import("wire/name.zig");
+    pub const types = @import("wire/types.zig");
+    pub const rdata = @import("wire/rdata.zig");
+    pub const message = @import("wire/message.zig");
+    pub const builder = @import("wire/builder.zig");
+
+    pub const Name = name.Name;
+    pub const Type = types.Type;
+    pub const Class = types.Class;
+    pub const Message = message.Message;
+    pub const Rr = message.Rr;
+    pub const Builder = builder.Builder;
+};
+
+test {
+    @import("std").testing.refAllDecls(wire);
+    _ = @import("wire/name.zig");
+    _ = @import("wire/types.zig");
+    _ = @import("wire/rdata.zig");
+    _ = @import("wire/message.zig");
+    _ = @import("wire/builder.zig");
+}
