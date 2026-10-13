@@ -10,6 +10,42 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Added
 
+* DNS wire-format codec (RFC 1035): strict, bounds-checked decoding;
+  encoding with name compression; presentation-format parser.
+* DNSSEC signature verification through Zig's standard library: RSASHA1,
+  RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256, ECDSAP384SHA384,
+  ED25519; DS digests SHA-1, SHA-256, SHA-384.
+* NSEC and NSEC3 denial-of-existence proofs (RFC 4035, RFC 5155, RFC 6840).
+* Chain-of-trust validator with `secure | insecure | bogus | indeterminate`
+  verdicts, static trust anchors (IANA root KSK-2017 and KSK-2024 built in),
+  resource budgets, and fail-closed default policies.
+* Validating stub client over DNS-over-HTTPS (HTTP/1.1, TLS end to end,
+  optional CONNECT proxy) and the `dnssec-stub` command-line tool.
+* Tests: RFC known-answer vectors, RFC appendix zones and responses, 263
+  recorded responses replayed offline, mutation attacks, fuzz targets with a
+  corpus; a cross-check against Unbound and ldns (`tests/crosscheck/`).
+* `zig-ci` workflow; container image (`build/container/Containerfile`).
+
+==== Fixed
+
+* Integer overflow in name decoding at the 255-octet boundary (found by
+  fuzzing).
+* DNAME answers were rejected because the synthesised CNAME was examined
+  first (found by the Unbound cross-check).
+
+==== Changed
+
+* Toolchain pin: Zig 0.16.0 → 0.17.0 (`mise.lock`).
+
+=== Inherited from rsr-template-repo at mint (2026-10-13)
+
+The entries below describe the template this repository was minted from, not
+zig-dnssec itself.
+
+==== Template [Unreleased]
+
+==== Added
+
 * `www/` site-operations bundle (issue #53): canonical `.well-known/`
   metadata, publishable content, policy sources, error bodies,
   security-header templates, Caddy/nginx/Apache integration examples, an

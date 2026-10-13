@@ -1,0 +1,53 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Builds and tests the zig-dnssec library with the Zig release pinned in
+# mise.lock. The toolchain is fetched from ziglang.org and checked against
+# its published SHA-256 (no third-party setup action).
+name: Zig CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      ZIG_VERSION: "0.17.0"
+      ZIG_SHA256: "1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026"
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install Zig (checksum-verified)
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/zig.tar.xz" \
+            "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          echo "${ZIG_SHA256}  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-${ZIG_VERSION}" >> "$GITHUB_PATH"
+
+      - name: Formatting
+        run: zig fmt --check build.zig src/root.zig src/wire src/dnssec src/stub src/cli tests
+
+      - name: Unit, RFC-vector, denial, replay and fuzz-corpus tests
+        run: zig build test --summary all
+
+      - name: ReleaseSafe build
+        run: zig build -Doptimize=ReleaseSafe
+
+      - name: Short fuzz run (standalone mutation fuzzer, fixed seed)
+        run: |
+          zig build fuzz-tool -Doptimize=ReleaseSafe
+          ./zig-out/bin/dnssec-fuzz all 20 0x2026

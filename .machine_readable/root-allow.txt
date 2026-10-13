@@ -84,3 +84,5 @@ tests/
 ?REQUIRES_INITIALISATION.md  # written by the minting process, removed once `just repo-init` runs
 ?Project.toml              # julia-library archetype: Pkg reads the package manifest from the package root only
 ?test/                     # julia-library archetype: Pkg.test runs test/runtests.jl, a fixed path (the spine keeps tests/)
+?build.zig                 # Zig package: `zig build` and `zig fetch` read the build script from the package root only
+?build.zig.zon             # Zig package manifest (name, version, fingerprint, paths); read from the package root only

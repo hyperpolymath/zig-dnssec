@@ -125,6 +125,14 @@ predecessors did.
 | yes
 | build orchestration: just/ phase modules, container/, docs-seed/, templates/, guix.scm (canon 1.2.1 guix-primary template_ref = build/)
 
+| `build.zig`
+| optional
+| Zig package: `zig build` and `zig fetch` read the build script from the package root only
+
+| `build.zig.zon`
+| optional
+| Zig package manifest (name, version, fingerprint, paths); read from the package root only
+
 | `ci/`
 | yes
 | .gitlab-ci.yml + .pre-commit-config.yaml; ci/README.adoc records the out-of-band GitLab project setting these require
@@ -248,7 +256,6 @@ your own repo - but do not read their emptiness as neglect here.
 | `src/errors/`
 | `src/interface/generated/`
 | `src/interface/generated/abi/`
-| `tests/fuzz/`
 | `verification/benchmarks/`
 | `verification/coverage/`
 | `verification/fuzzing/`
