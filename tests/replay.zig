@@ -412,3 +412,107 @@ test "resolveSecure refuses every non-secure verdict" {
     defer r.deinit();
     try testing.expectEqual(@as(usize, 1), r.verdict.secure.rrsets.len);
 }
+
+// ---------------------------------------------------------------------------
+// Insecurity claimed through an unverified RRSIG signer name.
+// ---------------------------------------------------------------------------
+
+/// The recorded response for (qname, qtype) in `records`.
+fn recorded(records: []const transport.Recorded, qname: []const u8, qtype: Type) ![]const u8 {
+    const n = try Name.fromText(qname);
+    for (records) |r| if (r.qtype == qtype and r.qname.eql(&n)) return r.response;
+    return error.NothingRecorded;
+}
+
+/// An attacker's negative answer for (qname, qtype): the SOA of `template`'s
+/// authority section with its RRSIG, every NSEC/NSEC3 removed, and the
+/// RRSIG(SOA) Signer's Name rewritten to `signer`. The signature no longer
+/// verifies; only the unauthenticated signer *name* points at a zone that
+/// is provably insecure.
+fn forgedDenial(gpa: std.mem.Allocator, template: []const u8, qname: []const u8, qtype: Type, rcode: u4, signer: []const u8) ![]u8 {
+    var msg = try Message.parse(gpa, template);
+    defer msg.deinit();
+    const out = try gpa.alloc(u8, 65535);
+    errdefer gpa.free(out);
+    var h = msg.header;
+    h.flags.rcode = rcode;
+    var b = try lib.wire.Builder.init(out, h);
+    try b.question(try Name.fromText(qname), qtype, .in);
+    const signer_name = try Name.fromText(signer);
+    var sig_rd: [2048]u8 = undefined;
+    var soa_seen = false;
+    for (msg.authority) |rr| {
+        switch (rr.type) {
+            .soa => {
+                try b.record(.authority, rr);
+                soa_seen = true;
+            },
+            .rrsig => {
+                const sig = try lib.wire.rdata.Rrsig.parse(rr.rdata);
+                if (sig.type_covered != .soa) continue;
+                var n: usize = 18;
+                @memcpy(sig_rd[0..18], rr.rdata[0..18]);
+                @memcpy(sig_rd[n..][0..signer_name.len], signer_name.bytes());
+                n += signer_name.len;
+                @memcpy(sig_rd[n..][0..sig.signature.len], sig.signature);
+                n += sig.signature.len;
+                var copy = rr;
+                copy.rdata = sig_rd[0..n];
+                try b.record(.authority, copy);
+            },
+            else => {},
+        }
+    }
+    if (!soa_seen) return error.TemplateHasNoSoa;
+    if (msg.edns) |e| try b.opt(e.udp_size, e.do_bit, e.options);
+    const wire = b.finish();
+    return gpa.realloc(out, wire.len);
+}
+
+test "negative: an RRSIG naming an insecure zone as signer proves nothing" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const www = try corpus.find("www.rsasha256.test.", .a);
+    const ins = try corpus.find("www.insecure.test.", .a);
+    // A NODATA from test. (SOA test. + NSEC3 proof) for the insecure
+    // delegation insecure.test.: the attacker's raw material.
+    const template = try recorded(ins.records, "insecure.test.", .ds);
+    const evil = "insecure.test."; // provably insecure, so its keys are never checked
+
+    // 1. A forged NXDOMAIN for a name in a signed zone, whose only "proof"
+    //    is an SOA whose RRSIG claims to be signed by the insecure zone.
+    {
+        const nx = try forgedDenial(a, template, "www.rsasha256.test.", .a, 3, evil);
+        const first = [_]transport.Recorded{.{ .qname = www.qname, .qtype = .a, .response = nx }};
+        const records = try merged(a, &first, try merged(a, www.records, ins.records));
+        try expectBogus(records, "www.rsasha256.test.", .a, null);
+    }
+    // 2. A tampered answer, plus a forged "no DS" for its zone in the same
+    //    style: the signed zone must not become insecure, so the tampered
+    //    data must not come back as an (insecure) answer.
+    {
+        const tampered = try mutate(a, try recorded(www.records, "www.rsasha256.test.", .a), .tamper_a);
+        const no_ds = try forgedDenial(a, template, "rsasha256.test.", .ds, 0, evil);
+        const first = [_]transport.Recorded{
+            .{ .qname = www.qname, .qtype = .a, .response = tampered },
+            .{ .qname = try Name.fromText("rsasha256.test."), .qtype = .ds, .response = no_ds },
+        };
+        const records = try merged(a, &first, try merged(a, www.records, ins.records));
+        try expectBogus(records, "www.rsasha256.test.", .a, null);
+    }
+    // 3. The same forged "no DS", for the NSEC3-signed zone of the opt-out
+    //    test zone's sibling, with the answer's RRSIGs stripped instead.
+    {
+        const s = try corpus.find("www.ecdsa256.test.", .a);
+        const stripped = try mutate(a, try recorded(s.records, "www.ecdsa256.test.", .a), .{ .strip_rrsig = .answer });
+        const no_ds = try forgedDenial(a, template, "ecdsa256.test.", .ds, 0, evil);
+        const first = [_]transport.Recorded{
+            .{ .qname = s.qname, .qtype = .a, .response = stripped },
+            .{ .qname = try Name.fromText("ecdsa256.test."), .qtype = .ds, .response = no_ds },
+            .{ .qname = try Name.fromText("www.ecdsa256.test."), .qtype = .ds, .response = try forgedDenial(a, template, "www.ecdsa256.test.", .ds, 0, evil) },
+        };
+        const records = try merged(a, &first, try merged(a, s.records, ins.records));
+        try expectBogus(records, "www.ecdsa256.test.", .a, null);
+    }
+}
