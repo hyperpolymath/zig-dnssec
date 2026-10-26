@@ -693,18 +693,22 @@ const Session = struct {
             if (zone == null or signer.labelCount() > zone.?.labelCount()) zone = signer;
         }
         const z = zone orelse {
-            // Unsigned NSEC/NSEC3 or SOA cannot prove anything; a signed SOA
-            // without denial records means a signed zone omitted its proof.
-            for (auth.sets) |*set| if (set.type == .soa and set.isSigned()) {
-                if (target.isSubdomainOf(&set.name)) {
-                    return switch (try s.zoneStatus(set.sigs[0].rrsig.signer)) {
-                        .secure => .{ .failed = fail(.denial_missing, target.*, .soa, null) },
-                        .insecure => |i| .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
-                        .bogus => |f| .{ .failed = f },
-                        .indeterminate => |f| .{ .failed = f },
-                    };
-                }
-            };
+            // No authenticated NSEC/NSEC3 record covers `target`. Whether the
+            // missing denial is legitimate (the zone is provably unsigned) or
+            // a downgrade (a signed zone that withheld its proof) is left to
+            // the caller, which walks the authenticated chain from the trust
+            // anchor down to the SOA *owner*.
+            //
+            // The RRSIG Signer's Name on the SOA must NOT be consulted here.
+            // It is unverified and attacker-controlled; an earlier version
+            // read it and called zoneStatus on it directly, with no signature
+            // check and no test that the signer was an ancestor of `target`.
+            // A forged response could then name any unrelated insecure zone as
+            // the signer and have a secure name's tampered or unsigned answer
+            // accepted as insecure rather than bogus. The SOA owner, by
+            // contrast, is only a hint for which zone the caller should
+            // authenticate from the anchor; a lie about it fails the caller's
+            // `isStrictSubdomainOf` / `isSubdomainOf` ancestry check.
             return .{ .none = soa_owner };
         };
         const ks = switch (try s.zoneStatus(z)) {
