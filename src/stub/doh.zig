@@ -57,12 +57,20 @@ pub const DohTransport = struct {
     host: []const u8,
     port: u16,
     path: []const u8,
+    /// The query component of the configured request target, without the
+    /// leading "?", or null when the URL has none. `std.Uri` stores the query
+    /// separately from `path`, so it has to be carried and re-joined here:
+    /// RFC 9112 §3.2.2 defines the request target as path *and* query, and a
+    /// DoH template such as `https://resolver.example/dns-query?token=...`
+    /// (RFC 8484 §3.1) uses the query for routing or authentication. Both
+    /// fields borrow from the `url` slice given to `init`.
+    query: ?[]const u8 = null,
     proxy: ?Proxy,
     ca_bundle: *std.crypto.Certificate.Bundle,
     ca_lock: Io.RwLock = .init,
 
-    /// `url` must be https. `path` may include a query string. The bundle
-    /// must already be populated (e.g. `Bundle.rescan`).
+    /// `url` must be https. Its path and query together form the request
+    /// target. The bundle must already be populated (e.g. `Bundle.rescan`).
     pub fn init(io: Io, url: []const u8, ca_bundle: *std.crypto.Certificate.Bundle, proxy: ?Proxy) !DohTransport {
         const uri = try std.Uri.parse(url);
         if (!std.ascii.eqlIgnoreCase(uri.scheme, "https")) return error.InsecureUrl;
@@ -70,18 +78,37 @@ pub const DohTransport = struct {
             .raw => |r| r,
             .percent_encoded => |p| p,
         };
+        // Kept in the form it appeared in the URL: a request target is
+        // percent-encoded on the wire, so decoding it here would corrupt any
+        // reserved octet a DoH template carries.
         const path = switch (uri.path) {
             .raw => |r| r,
             .percent_encoded => |p| p,
         };
+        const query: ?[]const u8 = if (uri.query) |q| switch (q) {
+            .raw => |r| r,
+            .percent_encoded => |p| p,
+        } else null;
         return .{
             .io = io,
             .host = host,
             .port = uri.port orelse 443,
             .path = if (path.len == 0) "/" else path,
+            .query = if (query) |q| (if (q.len == 0) null else q) else null,
             .proxy = proxy,
             .ca_bundle = ca_bundle,
         };
+    }
+
+    /// The origin-form request target (RFC 9112 §3.2.1): path, then "?" and
+    /// the query when one was configured. Written straight to the wire, so a
+    /// long template needs no buffer here.
+    fn writeRequestTarget(self: *const DohTransport, w: anytype) !void {
+        try w.writeAll(self.path);
+        if (self.query) |q| {
+            try w.writeByte('?');
+            try w.writeAll(q);
+        }
     }
 
     pub fn transport(self: *DohTransport) transport_mod.Transport {
@@ -139,7 +166,9 @@ pub const DohTransport = struct {
         });
 
         const w = &tls.writer;
-        try w.print("POST {s} HTTP/1.1\r\n", .{self.path});
+        try w.writeAll("POST ");
+        try self.writeRequestTarget(w);
+        try w.writeAll(" HTTP/1.1\r\n");
         if (self.port == 443) try w.print("Host: {s}\r\n", .{self.host}) else try w.print("Host: {s}:{d}\r\n", .{ self.host, self.port });
         try w.print("Content-Type: {s}\r\nAccept: {s}\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n", .{ media_type, media_type, query.len });
         try w.writeAll(query);
@@ -165,3 +194,52 @@ pub const DohTransport = struct {
         return body;
     }
 };
+
+test "the configured query component stays in the request target" {
+    var bundle: std.crypto.Certificate.Bundle = .empty;
+    // `init` only stores the Io; it performs no I/O, so nothing here reads it.
+    const io: Io = undefined;
+    const testing = std.testing;
+
+    // RFC 8484 §3.1 allows a DoH URI template to carry a query, and operators
+    // use one for routing or authentication. std.Uri keeps the query separate
+    // from `path`, so retaining only `path` sent "POST /dns-query" and silently
+    // dropped it.
+    var t = try DohTransport.init(io, "https://resolver.example:8443/dns-query?token=abc%20def&kid=k1", &bundle, null);
+    try testing.expectEqualStrings("resolver.example", t.host);
+    try testing.expectEqual(@as(u16, 8443), t.port);
+    try testing.expectEqualStrings("/dns-query", t.path);
+    try testing.expectEqualStrings("token=abc%20def&kid=k1", t.query.?);
+    // The target is percent-encoded on the wire, so escapes survive verbatim
+    // rather than being decoded into reserved octets.
+    var buf: [128]u8 = undefined;
+    _ = &buf;
+    var w = std.Io.Writer.fixed(&buf);
+    try t.writeRequestTarget(&w);
+    try testing.expectEqualStrings("/dns-query?token=abc%20def&kid=k1", w.buffered());
+
+    // No query: the target is the path alone, and an empty path becomes "/".
+    var t2 = try DohTransport.init(io, "https://dns.example", &bundle, null);
+    try testing.expectEqual(@as(u16, 443), t2.port);
+    try testing.expectEqualStrings("/", t2.path);
+    try testing.expect(t2.query == null);
+    var buf2: [128]u8 = undefined;
+    _ = &buf2;
+    var w2 = std.Io.Writer.fixed(&buf2);
+    try t2.writeRequestTarget(&w2);
+    try testing.expectEqualStrings("/", w2.buffered());
+
+    // A present-but-empty query is not a query: no bare "?" on the wire.
+    const t3 = try DohTransport.init(io, "https://dns.example/dns-query?", &bundle, null);
+    try testing.expectEqualStrings("/dns-query", t3.path);
+    try testing.expect(t3.query == null);
+
+    // A proxy is parsed independently of the target.
+    const p = try Proxy.parse("http://proxy.example:3128");
+    const t4 = try DohTransport.init(io, "https://dns.example/dns-query?a=b", &bundle, p);
+    try testing.expectEqualStrings("proxy.example", t4.proxy.?.host);
+    try testing.expectEqual(@as(u16, 3128), t4.proxy.?.port);
+
+    // http is still refused; a query is never a reason to relax that.
+    try testing.expectError(error.InsecureUrl, DohTransport.init(io, "http://dns.example/dns-query?a=b", &bundle, null));
+}
