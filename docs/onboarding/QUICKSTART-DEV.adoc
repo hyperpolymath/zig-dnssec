@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // Template: QUICKSTART-DEV.adoc — clone → build → test → PR
-// Replace zig-dnssec, UNASSIGNED, UNASSIGNED, UNASSIGNED with actuals
 = zig-dnssec — Quick Start for Developers
 :toc:
 :toclevels: 2
 
 == Tech Stack
 
-UNASSIGNED
+Zig 0.17.0, with Idris2 0.7.0 for the ABI model. Tooling: `just` and Bash.
 
 == Set Up Development Environment
 
@@ -32,14 +31,14 @@ just setup-dev
 
 [source,bash]
 ----
-UNASSIGNED
+just build
 ----
 
 == Test
 
 [source,bash]
 ----
-UNASSIGNED
+just test
 ----
 
 == Project Structure

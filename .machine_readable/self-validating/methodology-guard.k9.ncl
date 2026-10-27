@@ -56,7 +56,7 @@ let methodology_guard = {
     state_not_template = {
       description = "The ROADMAP journal must not contain template placeholders",
       severity = "warning",
-      # The journal, not the repo deed: a deed names zig-dnssec in
+      # The journal, not the repo deed: a deed names rsr-template-repo in
       # (lineage :instantiated-from) by design, so this pattern would always
       # fire there.
       file = "docs/status/ROADMAP.adoc",
@@ -67,9 +67,13 @@ let methodology_guard = {
       # check. Splitting the literal across "++" keeps the contiguous token text
       # out of the file (in this comment too) so init cannot match it, while
       # Nickel still evaluates the element back to the full token. Do not
-      # "simplify" it to a plain string. (The PLACEHOLDER token and
-      # "zig-dnssec" are not init tokens, so they survive as-is.)
-      reject_patterns = ["{{PLACEHOLDER}}", "{{" ++ "PROJECT}}", "zig-dnssec"],
+      # "simplify" it to a plain string. The PLACEHOLDER token is not an init
+      # token and survives as-is. The parent name is NOT safe the same way:
+      # the mint's global rename rewrote it into this repo's own name, so the
+      # check fired on every checkout (restored here by hand). It is anchored
+      # to the title form "= rsr-template-repo", the leaked-identity case,
+      # because the journal may legitimately cite rsr-template-repo issues.
+      reject_patterns = ["{{PLACEHOLDER}}", "{{" ++ "PROJECT}}", "= rsr-template-repo"],
     },
 
     coverage_updated = {
