@@ -7,10 +7,12 @@
 
 == Overview
 
-This guide covers packaging, deploying, and maintaining zig-dnssec for
-distribution on your platform.
+This guide covers building and packaging zig-dnssec for distribution on your
+platform. zig-dnssec is a library: it has no installer, no runnable application
+and no configuration file yet, so `just install`, `just run` and per-instance
+deployment are not wired. Only the paths below are.
 
-== Runtime Dependencies
+== Build Dependencies
 
 Zig 0.17.0, `just` (1.42 or later), and Idris2 0.7.0 for the ABI model checks that `just test` runs.
 
@@ -34,57 +36,18 @@ Output: `zig-out/`
 guix build -f build/guix.scm
 ----
 
-=== Container (Stapeln)
+This packages the source tree under `share/zig-dnssec/`.
+
+=== Container
 
 [source,bash]
 ----
-just stapeln-export    # Generates Containerfile
-podman build -t zig-dnssec .
+just container-build
 ----
 
-=== Manual Package
-
-[source,bash]
-----
-just install --prefix=/usr/local
-----
-
-Files installed:
-
-[cols="1,2"]
-|===
-| Path | Contents
-
-| `$PREFIX/bin/`
-| Executables
-
-| `$PREFIX/share/zig-dnssec/`
-| Data files, assets
-
-| `$PREFIX/share/doc/zig-dnssec/`
-| Documentation
-
-| `$PREFIX/share/applications/`
-| .desktop file (Linux, if GUI)
-
-| `$PREFIX/share/man/man1/`
-| Man pages
-|===
-
-== Configuration
-
-Default config location: `$XDG_CONFIG_HOME/zig-dnssec/config.toml`
-
-Fallback: `$HOME/.config/zig-dnssec/config.toml`
-
-== Health Checks
-
-[source,bash]
-----
-just doctor            # Full diagnostic
-just run --version   # Version check
-just run --selftest  # Built-in self-test
-----
+This builds `build/container/Containerfile` and tags the image
+`ghcr.io/hyperpolymath/zig-dnssec:latest`. `CT_REGISTRY` and `CT_TAG` override
+the registry and tag. `just container-push` publishes the same reference.
 
 == Updating
 
@@ -92,31 +55,16 @@ just run --selftest  # Built-in self-test
 ----
 git pull
 just build
-just install --prefix=/usr/local
+just test
 ----
-
-Or via OPSM: `opsm update zig-dnssec`
 
 == Security Notes
 
 * License: MPL-2.0 (code) / CC-BY-SA-4.0 (docs)
 * All dependencies SHA-pinned
-* `panic-attacker` scan results: link:INSTALL-SECURITY-REPORT.adoc[]
 * OpenSSF Scorecard: see badge in README
-
-== Multi-Instance Deployment
-
-For deploying multiple instances (e.g., different users or tenants):
-
-[source,bash]
-----
-just install --prefix=/opt/zig-dnssec-instance1 --config=/etc/zig-dnssec/instance1.toml
-just install --prefix=/opt/zig-dnssec-instance2 --config=/etc/zig-dnssec/instance2.toml
-----
-
-Each instance has isolated config, data, and logs.
+* Experimental and not independently reviewed: see the warning in the README
 
 == Reporting Issues
 
 * Upstream: https://github.com/hyperpolymath/zig-dnssec/issues
-* With diagnostic: `just help-me` (pre-fills context)
