@@ -71,7 +71,7 @@ jobs:
       - name: Install Zig (checksum-verified)
         run: |
           set -euo pipefail
-          curl -fsSL -o "$RUNNER_TEMP/zig.tar.xz" \
+          curl --proto '=https' --tlsv1.2 -fsSL -o "$RUNNER_TEMP/zig.tar.xz" \
             "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
           echo "${ZIG_SHA256}  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
           tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
