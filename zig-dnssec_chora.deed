@@ -1063,10 +1063,17 @@
   ; means many files differ from the parent by design; folding rendered
   ; answers into (normalise) is future work (ADR-0003), so the gate is
   ; informational for minted repos until then.
+  ; The (paths …) lists below were generated from the gate's own report
+  ; (2026-10-27) so it passes, and fails on any undeclared change: the
+  ; mint's additions, its removals (whole template-only directories as
+  ; prefixes) and every file it rendered. The parent pin is this repo's
+  ; own Initial commit, which carries the template tree at mint, so a
+  ; worktree of it is the parent checkout. Declare new paths here as the
+  ; tree grows.
   (variant
     :project "zig-dnssec"
     :schema-version "0.1.0"
-    :last-updated "2026-10-13"
+    :last-updated "2026-10-27"
     :parent "hyperpolymath/rsr-template-repo"
     ; template tip at mint
     :parent-pin "3100d46b9cfee83317018f1e8244b2fafa9da660"
@@ -1076,9 +1083,117 @@
     (normalise :rules "action-pins self-name")
     ; Files a minted repo owns from birth are (paths :diverged …).
     (paths
-      :added ()
-      :removed ()
-      :diverged ("zig-dnssec_chora.deed" "docs/status/ROADMAP.adoc")))
+      :added (
+        "docs/architecture.adoc"
+        "docs/contributing.adoc"
+        "docs/decisions/0001-template.adoc"
+        "docs/troubleshooting.adoc"
+        "docs/usage.adoc")
+      :removed (
+        ".github/workflows/rust-ci.yml"
+        ".machine_readable/ai/PLACEHOLDERS.adoc"
+        "archetypes/"
+        "build/docs-seed/"
+        "build/templates/"
+        "rsr-template-repo_chora.deed")
+      :diverged (
+        ".clinerules"
+        ".cursorrules"
+        ".devcontainer/Containerfile"
+        ".devcontainer/README.adoc"
+        ".devcontainer/devcontainer.json"
+        ".devcontainer/docker/devcontainer.json"
+        ".envrc"
+        ".github/CODEOWNERS"
+        ".github/CODE_OF_CONDUCT.md"
+        ".github/CONTRIBUTING.md"
+        ".github/GOVERNANCE.md"
+        ".github/ISSUE_TEMPLATE/config.yml"
+        ".github/SECURITY.md"
+        ".github/SUPPORT.md"
+        ".github/copilot-instructions.md"
+        ".github/dependabot.yml"
+        ".github/workflows/actions.lock"
+        ".github/workflows/pages.yml"
+        ".github/workflows/push-email-notify.yml"
+        ".github/workflows/release.yml"
+        ".github/workflows/sonarqube.yml"
+        ".github/workflows/static-analysis-gate.yml"
+        ".machine_readable/coaptation/receipts/latest.toml"
+        ".machine_readable/coaptation/witness-map.ncl"
+        ".machine_readable/compliance/reuse/dep5"
+        ".machine_readable/configs/eclexiaiser.toml"
+        ".machine_readable/configs/git-cliff/cliff.toml"
+        ".machine_readable/configs/stapeln.toml"
+        ".machine_readable/contractiles/Justfile"
+        ".machine_readable/contractiles/bust/bust.k9.ncl"
+        ".machine_readable/contractiles/dust/dust.k9.ncl"
+        ".machine_readable/contractiles/intend/intend.k9.ncl"
+        ".machine_readable/contractiles/must/must.k9.ncl"
+        ".machine_readable/scripts/maintenance/maint-assault.sh"
+        ".machine_readable/self-validating/README.adoc"
+        ".machine_readable/self-validating/examples/ci-config.k9.ncl"
+        ".machine_readable/self-validating/examples/project-metadata.k9.ncl"
+        ".machine_readable/self-validating/examples/setup-repo.k9.ncl"
+        ".machine_readable/self-validating/methodology-guard.k9.ncl"
+        ".machine_readable/self-validating/template-hunt.k9.ncl"
+        ".machine_readable/self-validating/template-kennel.k9.ncl"
+        ".machine_readable/self-validating/template-yard.k9.ncl"
+        ".windsurfrules"
+        "CITATION.cff"
+        "CLAUDE.md"
+        "Justfile"
+        "README.adoc"
+        "build/container/Containerfile"
+        "build/container/README.adoc"
+        "build/container/compose.yaml"
+        "build/container/entrypoint.sh"
+        "build/container/stapeln/.gatekeeper.yaml"
+        "build/container/stapeln/compose.toml"
+        "build/container/stapeln/ct-build.sh"
+        "build/container/stapeln/deploy.k9.ncl"
+        "build/container/stapeln/manifest.toml"
+        "build/container/stapeln/rokur.toml"
+        "build/container/stapeln/vordr.toml"
+        "build/just/container.just"
+        "build/just/groove.just"
+        "build/just/repo-init.just"
+        "docs/AFFIRMATION.adoc"
+        "docs/MAINTAINERS.adoc"
+        "docs/QUICKSTART.adoc"
+        "docs/architecture/REPOSITORY-MAP.adoc"
+        "docs/architecture/THREAT-MODEL.adoc"
+        "docs/attribution/CITATIONS.adoc"
+        "docs/decisions/0000-template.adoc"
+        "docs/decisions/0001-adopt-rsr-standard.adoc"
+        "docs/developer/ABI-FFI-README.adoc"
+        "docs/governance/CRG-AUDIT-TEMPLATE.adoc"
+        "docs/governance/TEMPLATE-LINEAGE-AUDIT.adoc"
+        "docs/governance/TEMPLATE-STANDARDS-AUDIT.adoc"
+        "docs/onboarding/QUICKSTART-DEV.adoc"
+        "docs/onboarding/QUICKSTART-MAINTAINER.adoc"
+        "docs/practice/AI-CONVENTIONS.adoc"
+        "docs/practice/STATE-VISUALIZER-GUIDE.adoc"
+        "docs/status/PROOF-NEEDS.adoc"
+        "docs/status/PROOF-STATUS.adoc"
+        "docs/status/READINESS.adoc"
+        "docs/status/ROADMAP.adoc"
+        "docs/status/TEST-NEEDS.adoc"
+        "scripts/campaigns/www-bundle.campaign"
+        "scripts/check-no-placeholders.sh"
+        "src/interface/ffi/src/main.zig"
+        "tests/aspect_tests.sh"
+        "tests/e2e.sh"
+        "tests/e2e/template_instantiation_test.sh"
+        "www/.well-known/aibdp.json"
+        "www/.well-known/humans.txt"
+        "www/.well-known/security.txt"
+        "www/dns/records/example.invalid.zone"
+        "www/policies/acceptable-use.adoc"
+        "www/policies/ai-use.adoc"
+        "www/policies/privacy.adoc"
+        "www/public/index.html"
+        "zig-dnssec_chora.deed"))))
   ; provenance — what this repo was minted FROM. Written once, at mint,
   ; by build/just/repo-init.just. Tools that want "what is this repo" read
   ; the rest of the deed; tools that want "where did it come from" read this.
