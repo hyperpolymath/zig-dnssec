@@ -114,7 +114,9 @@ pub fn run(gpa: Allocator, t: transport.Transport, req: Request) Status {
     if (req.policy & ~policy_mask != 0) return .invalid_argument;
     const qname_z = req.qname orelse return .invalid_argument;
     const qtype = Type.fromInt(req.qtype);
-    if (req.qtype == 0 or qtype.isMetaOrQtype()) return .invalid_argument;
+    // QTYPE=RRSIG is refused here rather than validated: nothing signs an
+    // RRSIG RRset, so there is no verdict to give (see validator.validateResponse).
+    if (req.qtype == 0 or qtype == .rrsig or qtype.isMetaOrQtype()) return .invalid_argument;
     const qname = Name.fromText(std.mem.span(qname_z)) catch return .bad_name;
 
     var anchors = if (req.anchors) |a|

@@ -183,6 +183,10 @@ test "bad arguments fail closed: status set, security NONE" {
         .{ .trace = trace.ptr, .anchors = anchors_z.ptr, .qname = "www.rsasha256.test.", .qtype = 0, .expect = h.ZIG_DNSSEC_ERR_INVALID_ARGUMENT },
         .{ .trace = trace.ptr, .anchors = anchors_z.ptr, .qname = "www.rsasha256.test.", .qtype = 255, .expect = h.ZIG_DNSSEC_ERR_INVALID_ARGUMENT },
         .{ .trace = trace.ptr, .anchors = anchors_z.ptr, .qname = "www.rsasha256.test.", .qtype = 41, .expect = h.ZIG_DNSSEC_ERR_INVALID_ARGUMENT },
+        // QTYPE=RRSIG (46) is refused here, not validated: nothing signs an
+        // RRSIG RRset, so there is no verdict to give. Accepting it used to
+        // hand the caller a bogus answer for a correctly signed response.
+        .{ .trace = trace.ptr, .anchors = anchors_z.ptr, .qname = "www.rsasha256.test.", .qtype = 46, .expect = h.ZIG_DNSSEC_ERR_INVALID_ARGUMENT },
         .{ .trace = trace.ptr, .anchors = anchors_z.ptr, .qname = "a..b", .expect = h.ZIG_DNSSEC_ERR_BAD_NAME },
         .{ .trace = trace.ptr, .anchors = "not an anchor", .qname = "www.rsasha256.test.", .expect = h.ZIG_DNSSEC_ERR_BAD_ANCHORS },
         .{ .trace = trace.ptr, .anchors = "", .qname = "www.rsasha256.test.", .expect = h.ZIG_DNSSEC_ERR_BAD_ANCHORS },
