@@ -1213,6 +1213,7 @@
         "mise.lock"
         "scripts/campaigns/www-bundle.campaign"
         "scripts/check-no-placeholders.sh"
+        "scripts/validate-template.sh"
         "src/README.adoc"
         "src/interface/Abi/Foreign.idr"
         "src/interface/Abi/Layout.idr"
@@ -1235,7 +1236,7 @@
         "www/policies/ai-use.adoc"
         "www/policies/privacy.adoc"
         "www/public/index.html"
-        "zig-dnssec_chora.deed"))))
+        "zig-dnssec_chora.deed")))
   ; provenance — what this repo was minted FROM. Written once, at mint,
   ; by build/just/repo-init.just. Tools that want "what is this repo" read
   ; the rest of the deed; tools that want "where did it come from" read this.

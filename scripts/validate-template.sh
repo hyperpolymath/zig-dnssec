@@ -43,11 +43,44 @@ log_pass() {
     echo -e "${GREEN}PASS${NC}: $*" >&2
 }
 
+# A variant contract may declare paths that are deliberately absent from this
+# repository: `(paths ... :removed ("a" "b"))` in <reponame>_chora.deed. Such a
+# path is not a missing file. Requiring it here makes this validator contradict
+# the very contract that governs the repository it is pointed at, and because
+# `check_file_exists` returns 1 under `set -e` the script aborted on the first
+# one and never reported anything else.
+variant_removed() {
+    local want="$1"
+    local deed
+    for deed in "$REPO_ROOT"/*_chora.deed; do
+        [ -f "$deed" ] || continue
+        if awk -v want="$want" '
+            /:removed[ \t]*\(/ { inrm = 1 }
+            inrm {
+                line = $0
+                while (match(line, /"[^"]*"/)) {
+                    if (substr(line, RSTART + 1, RLENGTH - 2) == want) found = 1
+                    line = substr(line, RSTART + RLENGTH)
+                }
+                if ($0 ~ /\)[ \t]*$/) inrm = 0
+            }
+            END { exit(found ? 0 : 1)
+            }
+        ' "$deed"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 check_file_exists() {
     local file="$1"
     local description="${2:-}"
     if [ -f "$REPO_ROOT/$file" ]; then
         [ "$VERBOSE" = "1" ] && log_pass "File exists: $file"
+        return 0
+    elif variant_removed "$file"; then
+        [ "$VERBOSE" = "1" ] && log_pass "Removed by variant contract: $file"
         return 0
     else
         log_error "Required file missing: $file ${description:+(${description})}"
@@ -89,6 +122,9 @@ check_dir_exists() {
     local description="${2:-}"
     if [ -d "$REPO_ROOT/$dir" ]; then
         [ "$VERBOSE" = "1" ] && log_pass "Directory exists: $dir"
+        return 0
+    elif variant_removed "$dir" || variant_removed "$dir/"; then
+        [ "$VERBOSE" = "1" ] && log_pass "Removed by variant contract: $dir"
         return 0
     else
         log_error "Required directory missing: $dir ${description:+(${description})}"
@@ -409,6 +445,25 @@ if [ -f "$REPO_ROOT/src/interface/ffi/build.zig" ]; then
         cd - > /dev/null
     else
         log_warning "Zig compiler not found - skipping Zig build check"
+    fi
+elif variant_removed "src/interface/ffi/build.zig"; then
+    # This variant folded the FFI build into the repository root's build.zig
+    # (the `ffi` step installs the C ABI shared library and its header), and
+    # the deed's (paths :removed ...) says so. Building the root package is the
+    # equivalent check; erroring on the removed path would report a contract
+    # the repository deliberately made as a defect.
+    if [ -f "$REPO_ROOT/build.zig" ]; then
+        if command -v zig &> /dev/null; then
+            if (cd "$REPO_ROOT" && zig build ffi 2>&1 | grep -q "error"); then
+                log_error "Zig build failed"
+            else
+                log_pass "Zig build successful"
+            fi
+        else
+            log_warning "Zig compiler not found - skipping Zig build check"
+        fi
+    else
+        log_error "Neither src/interface/ffi/build.zig nor build.zig found"
     fi
 else
     log_error "Zig build.zig not found"
