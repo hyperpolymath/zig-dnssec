@@ -97,8 +97,8 @@ let base    = import "../_base.ncl" in
   # Read by .machine_readable/coaptation/extract-clauses.sh.
   # -------------------------------------------------------------------
   declaration = {
-    preamble = "# SPDX-License-Identifier: MPL-2.0\n# Dustfile — Cleanup and hygiene contract for rsr-template-repo\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# Paired runner: dust.ncl\n# Verb:          dust\n# Semantics:     What should be cleaned up. Housekeeping, not blockers.\n#\n# This repository: rsr-template-repo is the canonical template.\n# Cleanup items here ensure the template itself remains pristine.\n",
-    abstract = "Cleanup and hygiene items for rsr-template-repo. These are maintenance tasks\nthat ensure the template repository remains clean and ready for distribution\nto new repositories.",
+    preamble = "# SPDX-License-Identifier: MPL-2.0\n# Dustfile — Cleanup and hygiene contract for zig-dnssec\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# Paired runner: dust.ncl\n# Verb:          dust\n# Semantics:     What should be cleaned up. Housekeeping, not blockers.\n#\n# This repository: zig-dnssec is the canonical template.\n# Cleanup items here ensure the template itself remains pristine.\n",
+    abstract = "Cleanup and hygiene items for zig-dnssec. The items below were\ninherited from rsr-template-repo at mint and are pending owner review.",
     prose = [
     ],
     removal_candidates = [
@@ -144,10 +144,10 @@ let base    = import "../_base.ncl" in
       {
         id = "no-stale-template-references",
         section = "Template Hygiene",
-        description = "No references to rsr-template-repo in generic template files",
-        probe = "test -z \"$(grep -r 'rsr-template-repo' machine-readable-design/ 2>/dev/null)\"",
+        description = "No references to zig-dnssec in generic template files",
+        probe = "test -z \"$(grep -r 'zig-dnssec' machine-readable-design/ 2>/dev/null)\"",
         severity = 'warning,
-        notes = "Generic templates should use {{PROJECT_NAME}} or similar placeholders",
+        notes = "Generic templates should use zig-dnssec or similar placeholders",
       },
       {
         id = "version-sync-checked",

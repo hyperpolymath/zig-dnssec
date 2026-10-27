@@ -85,8 +85,8 @@ let base    = import "../_base.ncl" in
   # Read by .machine_readable/coaptation/extract-clauses.sh.
   # -------------------------------------------------------------------
   declaration = {
-    preamble = "# SPDX-License-Identifier: MPL-2.0\n# Adjustfile — Drift-tolerance contract for rsr-template-repo\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# Cumulative-drift catchment: tolerance bands + corrective actions.\n# Authority: advisory (Yard) — continue-with-warnings; auto_fix where deterministic.\n# Run with: adjust check\n# Fix with: adjust fix (applies deterministic patches; advisory otherwise)\n",
-    abstract = "Drift tolerances and corrective actions for rsr-template-repo. Unlike\nMUST (hard gate), ADJUST tracks cumulative drift against tolerance bands\nand proposes corrective actions. Advisory — it warns and trends, it does\nnot block.",
+    preamble = "# SPDX-License-Identifier: MPL-2.0\n# Adjustfile — Drift-tolerance contract for zig-dnssec\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# Cumulative-drift catchment: tolerance bands + corrective actions.\n# Authority: advisory (Yard) — continue-with-warnings; auto_fix where deterministic.\n# Run with: adjust check\n# Fix with: adjust fix (applies deterministic patches; advisory otherwise)\n",
+    abstract = "Drift tolerances and corrective actions for zig-dnssec. Unlike\nMUST (hard gate), ADJUST tracks cumulative drift against tolerance bands\nand proposes corrective actions. Advisory — it warns and trends, it does\nnot block.",
     prose = [
     ],
     requirements = [

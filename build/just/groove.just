@@ -77,9 +77,11 @@ verify-template:
         FOUND=1
     fi
 
-    # Check for template defaults still present
-    if grep -q 'rsr-template-repo' Justfile 2>/dev/null; then
-        echo "⚠ Justfile still references 'rsr-template-repo' — update project name"
+    # Check for template defaults still present: the template's own project
+    # default, not any mention (a minted Justfile legitimately cites
+    # rsr-template-repo issues, e.g. rsr-template-repo#209).
+    if grep -qE '^project[[:space:]]*:=[[:space:]]*"rsr-template-repo"' Justfile 2>/dev/null; then
+        echo "⚠ Justfile still sets project := \"rsr-template-repo\" — update project name"
         FOUND=1
     fi
 

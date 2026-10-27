@@ -5,13 +5,13 @@
 
 [receipt]
 schema = "hyperpolymath.coaptation/1"
-repo = "rsr-template-repo"
-band = "amber"
-proposed-action = "advisory — soft drift within bands (posture/intend). Open an advisory issue; no re-anchor."
+repo = "zig-dnssec"
+band = "green"
+proposed-action = "none — the descriptile self-model coapts with the contractile set-point within tolerance."
 
 [coverage]
-clauses-total = 52
-descriptile-witnessed = 1
+clauses-total = 45
+descriptile-witnessed = 2
 probe-deferred-to-hunt = 26
 must-trust-unmeasured-gaps = 0
 note = "Yard sees descriptile evidence only; probe-deferred obligations need a Hunt-tier run for a full hard-gate."
@@ -26,13 +26,13 @@ gate = "pass"
 
 [reading.adjust]
 grade = "posture (advisory; accessibility / inclusive design)"
-satisfied = "0/1"
-posture-ok = false
+satisfied = "1/1"
+posture-ok = true
 
 [reading.intend]
 grade = "tropical (min-plus distance-to-north-star; wishes excluded)"
-committed-intents = 3
-distance = 2
+committed-intents = 0
+distance = 0
 within-tolerance = true
 
 [reading.bust]
@@ -44,13 +44,6 @@ grade = "expected (planned exnovation)"
 items = 7
 
 [clauses]
-intend.repo-initialization = "intent:done"
-intend.contractile-completeness = "intent:in_progress"
-intend.automation-scripts = "intent:in_progress"
-intend.cross-repo-validation = "wish:declared"
-intend.automated-substitution = "wish:declared"
-intend.formal-verification = "wish:declared"
-intend.ecosystem-visualization = "wish:declared"
 must.license-present = "probe-deferred"
 must.readme-present = "probe-deferred"
 must.security-policy = "probe-deferred"
@@ -78,7 +71,7 @@ trust.no-dockerfile = "probe-deferred"
 trust.site-security-headers = "probe-deferred"
 trust.site-well-known = "probe-deferred"
 trust.site-resource-records = "probe-deferred"
-adjust.placeholder-drift = "refuted"
+adjust.placeholder-drift = "witnessed"
 adjust.template-version-drift = "unmeasured"
 adjust.readme-completeness = "unmeasured"
 adjust.example-accuracy = "unmeasured"
@@ -98,5 +91,5 @@ bust.sync-drift-between-repos = "latent"
 bust.contractile-parse-error = "latent"
 
 [provenance]
-contractiles = "intend@feaaa58c4690 must@6a15dd3ccc3a trust@71566e6b64fc adjust@d7e4225fe5a8 dust@448489330834 bust@ea93d531c781"
-descriptiles = "deed@ab944221ee82 anchor@51194a4e21e8"
+contractiles = "intend@219a3408c7dc must@f272c8d417e5 trust@a9afe7caf6f3 adjust@ad30471e03ef dust@eed13d797a25 bust@d7c2b84aae6f"
+descriptiles = "deed@b75ebbc195fa anchor@4a142af01194"

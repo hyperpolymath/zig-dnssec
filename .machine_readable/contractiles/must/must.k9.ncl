@@ -112,8 +112,8 @@ let base    = import "../_base.ncl" in
   # Read by .machine_readable/coaptation/extract-clauses.sh.
   # -------------------------------------------------------------------
   declaration = {
-    preamble = "# SPDX-License-Identifier: MPL-2.0\n# Mustfile — Physical state contract for rsr-template-repo\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# What MUST be true about this repository. Hard requirements.\n# Run with: must check\n# Fix with: must fix (where a deterministic fix exists)\n",
-    abstract = "Physical-state invariants for rsr-template-repo. This is the canonical\nRSR template repository. These are hard requirements — CI and pre-commit\nhooks fail if any check fails.",
+    preamble = "# SPDX-License-Identifier: MPL-2.0\n# Mustfile — Physical state contract for zig-dnssec\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# What MUST be true about this repository. Hard requirements.\n# Run with: must check\n# Fix with: must fix (where a deterministic fix exists)\n",
+    abstract = "Physical-state invariants for zig-dnssec. The invariants below were\ninherited from rsr-template-repo at mint and are pending owner review; this\nrepository's own invariants (for example its fail-closed verdict rules) are not\nyet declared here. These are hard requirements — CI and pre-commit hooks fail\nif any check fails.",
     prose = [
       {
         section = "Template Integrity",

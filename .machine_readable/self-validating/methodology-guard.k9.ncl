@@ -1,6 +1,6 @@
 K9!
 # SPDX-License-Identifier: MPL-2.0
-# Copyright (c) {{CURRENT_YEAR}} {{AUTHOR}} ({{OWNER}}) <{{AUTHOR_EMAIL}}>
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 #
 # K9 Validator: Methodology Guard
 # Checks that agent work respects methodology constraints declared in the
@@ -67,9 +67,13 @@ let methodology_guard = {
       # check. Splitting the literal across "++" keeps the contiguous token text
       # out of the file (in this comment too) so init cannot match it, while
       # Nickel still evaluates the element back to the full token. Do not
-      # "simplify" it to a plain string. (The PLACEHOLDER token and
-      # "rsr-template-repo" are not init tokens, so they survive as-is.)
-      reject_patterns = ["{{PLACEHOLDER}}", "{{" ++ "PROJECT}}", "rsr-template-repo"],
+      # "simplify" it to a plain string. The PLACEHOLDER token is not an init
+      # token and survives as-is. The parent name is NOT safe the same way:
+      # the mint's global rename rewrote it into this repo's own name, so the
+      # check fired on every checkout (restored here by hand). It is anchored
+      # to the title form "= rsr-template-repo", the leaked-identity case,
+      # because the journal may legitimately cite rsr-template-repo issues.
+      reject_patterns = ["{{PLACEHOLDER}}", "{{" ++ "PROJECT}}", "= rsr-template-repo"],
     },
 
     coverage_updated = {

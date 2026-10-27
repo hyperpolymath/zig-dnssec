@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // Template: QUICKSTART-DEV.adoc — clone → build → test → PR
-// Replace rsr-template-repo, {{BUILD_CMD}}, {{TEST_CMD}}, {{LANG_STACK}} with actuals
-= rsr-template-repo — Quick Start for Developers
+= zig-dnssec — Quick Start for Developers
 :toc:
 :toclevels: 2
 
 == Tech Stack
 
-{{LANG_STACK}}
+Zig 0.17.0, with Idris2 0.7.0 for the ABI model. Tooling: `just` and Bash.
 
 == Set Up Development Environment
 
@@ -23,8 +22,8 @@ guix shell
 
 [source,bash]
 ----
-git clone https://github.com/hyperpolymath/rsr-template-repo.git
-cd rsr-template-repo
+git clone https://github.com/hyperpolymath/zig-dnssec.git
+cd zig-dnssec
 just setup-dev
 ----
 
@@ -32,21 +31,21 @@ just setup-dev
 
 [source,bash]
 ----
-{{BUILD_CMD}}
+just build
 ----
 
 == Test
 
 [source,bash]
 ----
-{{TEST_CMD}}
+just test
 ----
 
 == Project Structure
 
 [source]
 ----
-rsr-template-repo/
+zig-dnssec/
 ├── src/                  # Source code
 ├── src/interface/Abi/              # Idris2 ABI definitions (if applicable)
 ├── ffi/zig/              # Zig FFI bridge (if applicable)
@@ -81,10 +80,16 @@ just panic-scan     # No new security issues
 
 == Contractile Invariants
 
-Read `.machine_readable/MUST.contractile` before making changes.
+Read `.machine_readable/contractiles/must/must.k9.ncl` before making changes.
 Key invariants that must never be violated:
 
-{{MUST_INVARIANTS}}
+The `must` contractile's project-specific invariants are pending owner
+authorship (it still carries invariants inherited from the template). Until
+they are declared, the repo deed `zig-dnssec_chora.deed` is the authority. Its
+headline rule:
+
+* Fail-closed DNSSEC verdicts: answer data is reachable only from a secure
+  verdict or an insecure one that carries an authenticated proof.
 
 == LLM/AI Agent Development
 
@@ -100,5 +105,5 @@ Or read the repo deed (`*_chora.deed` at root) and `.claude/CLAUDE.md` directly.
 == Get Help
 
 * **Architecture**: link:EXPLAINME.adoc[EXPLAINME.adoc]
-* **Wiki**: https://github.com/hyperpolymath/rsr-template-repo/wiki
+* **Wiki**: https://github.com/hyperpolymath/zig-dnssec/wiki
 * **Report issue**: `just help-me`

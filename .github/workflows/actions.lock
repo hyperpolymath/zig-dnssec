@@ -71,8 +71,6 @@ workflows:
         - 'actions/checkout@v7.0.1'
     '.github/workflows/runtime-policy.yml':
         - 'actions/checkout@v7.0.1'
-    '.github/workflows/rust-ci.yml':
-        - 'hyperpolymath/standards@da2c748aad55c1a1dcba00b60fe4a35017bc6540'
     '.github/workflows/scorecard.yml':
         - 'hyperpolymath/standards@da2c748aad55c1a1dcba00b60fe4a35017bc6540'
     '.github/workflows/secret-scanner.yml':

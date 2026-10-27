@@ -101,81 +101,32 @@ let base    = import "../_base.ncl" in
   # Read by .machine_readable/coaptation/extract-clauses.sh.
   # -------------------------------------------------------------------
   declaration = {
-    preamble = "# SPDX-License-Identifier: MPL-2.0\n# Intentfile — north-star contractile for rsr-template-repo\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# Paired runner: intend.ncl\n# Verb:          intend\n#\n# Semantics: North-star contractile. Declares BOTH concrete committed\n#            next-actions AND horizon aspirations the project wishes to\n#            become. Two sections share one file because they answer\n#            the same question at different ranges:\n#              [[intents]] — \"we WILL do this; track progress\"\n#                            status: declared → in_progress → done |\n#                                    deferred | retired\n#              [[wishes]]  — \"we WISH this were true; revisit later\"\n#                            status: declared → in_progress → achieved |\n#                                    abandoned\n#                            grouped by horizon: near / mid / far.\n#            Non-gating — this is a report, not a gate. See the `must`\n#            contractile for hard gates.\n",
-    abstract = "North-star contractile for rsr-template-repo. This repository is the\ncanonical template for Rhodium Standard Repository compliance. It provides\nthe scaffold that all hyperpolymath repos should copy and customize.",
+    preamble = "# SPDX-License-Identifier: MPL-2.0\n# Intentfile — north-star contractile for zig-dnssec\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# Paired runner: intend.ncl\n# Verb:          intend\n#\n# Semantics: North-star contractile. Declares BOTH concrete committed\n#            next-actions AND horizon aspirations the project wishes to\n#            become. Two sections share one file because they answer\n#            the same question at different ranges:\n#              [[intents]] — \"we WILL do this; track progress\"\n#                            status: declared → in_progress → done |\n#                                    deferred | retired\n#              [[wishes]]  — \"we WISH this were true; revisit later\"\n#                            status: declared → in_progress → achieved |\n#                                    abandoned\n#                            grouped by horizon: near / mid / far.\n#            Non-gating — this is a report, not a gate. See the `must`\n#            contractile for hard gates.\n",
+    # DECLARATION PENDING (owner to author). The mint carried the template's
+    # own north star here under this repo's name ("master template ... not a
+    # runtime library"), which is false for zig-dnssec. Those statements and
+    # the template-maintenance intents and wishes were removed rather than
+    # rewritten: this repo's intents are the owner's to declare. Until then
+    # the deed's (identity) purpose and IS-NOT clauses are the authority.
+    # Source fix proposed upstream: repo-init should generate this
+    # declaration from the deed instead of copying the template's.
+    abstract = "North-star contractile for zig-dnssec. Declaration pending: the owner\nhas not yet authored this repository's purpose, anti-purpose, intents and\nwishes. Until then the repo deed's purpose and IS-NOT clauses are the\nauthority for what zig-dnssec is for.",
     prose = [
       {
         section = "Purpose",
-        text = "The rsr-template-repo serves as the master template for all hyperpolymath\nrepositories. It contains the complete set of contractile files, machine-readable\nspecifications, and governance documentation that define the Rhodium Standard.\n\nEvery new repository in the hyperpolymath estate should be initialized by\ncopying this template and substituting the placeholder values with\nrepo-specific content.",
+        text = "Pending owner authorship. See the purpose clause of zig-dnssec_chora.deed.",
       },
       {
         section = "Anti-Purpose",
-        text = "This repository is NOT:\n- A general-purpose project scaffold for external use (hyperpolymath-only)\n- A replacement for per-repo customization (all files must be bespoke)\n- A static template that never changes (evolves with RSR spec)\n- A runtime library or framework (build-time only)",
+        text = "Pending owner authorship. See the IS-NOT clause of zig-dnssec_chora.deed.",
       },
       {
         section = "If In Doubt",
         text = "If you are unsure whether a change is in scope, ask. Sensitive areas:\n- .machine_readable/ contractile definitions\n- RSR specification files\n- Governance templates\n- License policy documents",
       },
     ],
-    intents = [
-      {
-        id = "repo-initialization",
-        section = "Committed Next-Actions",
-        description = "Provide just copy-and-substitute template for new repos",
-        probe = "test -f scripts/init-repo.sh",
-        status = 'done,
-        notes = "Run with source scripts/init-repo.sh <new-repo-name>",
-      },
-      {
-        id = "contractile-completeness",
-        section = "Committed Next-Actions",
-        description = "Every RSR contractile has a k9 declaration and an ncl implementation",
-        probe = "ls .machine_readable/contractiles/*/*.k9.ncl | wc -l | grep -q \"^6$\"",
-        status = 'in_progress,
-        notes = "Currently 6 contractile verbs: intend, must, trust, adjust, bust, dust",
-      },
-      {
-        id = "automation-scripts",
-        section = "Committed Next-Actions",
-        description = "All repetitive tasks have just recipes",
-        probe = "grep -c \"^# \" Justfile | grep -q \"^[6-9][0-9]*$\"",
-        status = 'in_progress,
-      },
-    ],
-    wishes = [
-      {
-        id = "cross-repo-validation",
-        section = "Wishes",
-        group = "Near Horizon",
-        description = "Tooling to validate all repos against RSR spec",
-        horizon = 'near,
-        status = 'declared,
-      },
-      {
-        id = "automated-substitution",
-        section = "Wishes",
-        group = "Near Horizon",
-        description = "Script to automate repo-specific substitution in template",
-        horizon = 'near,
-        status = 'declared,
-      },
-      {
-        id = "formal-verification",
-        section = "Wishes",
-        group = "Mid Horizon",
-        description = "Idris2 proofs for all critical contractile invariants",
-        horizon = 'mid,
-        status = 'declared,
-      },
-      {
-        id = "ecosystem-visualization",
-        section = "Wishes",
-        group = "Far Horizon",
-        description = "Interactive graph of all hyperpolymath repos and dependencies",
-        horizon = 'far,
-        status = 'declared,
-      },
-    ],
+    intents = [],
+    wishes = [],
   },
 
   # -------------------------------------------------------------------

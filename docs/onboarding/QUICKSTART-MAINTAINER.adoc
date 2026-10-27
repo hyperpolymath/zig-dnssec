@@ -1,30 +1,29 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // Template: QUICKSTART-MAINTAINER.adoc — packaging, deploying, and maintaining
-// Replace rsr-template-repo, {{PACKAGE_NAME}}, {{DEPS}} with actuals
-= rsr-template-repo — Quick Start for Platform Maintainers
+= zig-dnssec — Quick Start for Platform Maintainers
 :toc:
 :toclevels: 2
 
 == Overview
 
-This guide covers packaging, deploying, and maintaining rsr-template-repo for
+This guide covers packaging, deploying, and maintaining zig-dnssec for
 distribution on your platform.
 
 == Runtime Dependencies
 
-{{DEPS}}
+Zig 0.17.0, `just` (1.42 or later), and Idris2 0.7.0 for the ABI model checks that `just test` runs.
 
 == Build from Source
 
 [source,bash]
 ----
-git clone https://github.com/hyperpolymath/rsr-template-repo.git
-cd rsr-template-repo
-just build-release
+git clone https://github.com/hyperpolymath/zig-dnssec.git
+cd zig-dnssec
+just build
 ----
 
-Output: `{{BUILD_OUTPUT_PATH}}`
+Output: `zig-out/`
 
 == Packaging
 
@@ -40,7 +39,7 @@ guix build -f build/guix.scm
 [source,bash]
 ----
 just stapeln-export    # Generates Containerfile
-podman build -t rsr-template-repo .
+podman build -t zig-dnssec .
 ----
 
 === Manual Package
@@ -59,10 +58,10 @@ Files installed:
 | `$PREFIX/bin/`
 | Executables
 
-| `$PREFIX/share/{{PACKAGE_NAME}}/`
+| `$PREFIX/share/zig-dnssec/`
 | Data files, assets
 
-| `$PREFIX/share/doc/{{PACKAGE_NAME}}/`
+| `$PREFIX/share/doc/zig-dnssec/`
 | Documentation
 
 | `$PREFIX/share/applications/`
@@ -74,9 +73,9 @@ Files installed:
 
 == Configuration
 
-Default config location: `$XDG_CONFIG_HOME/{{PACKAGE_NAME}}/config.toml`
+Default config location: `$XDG_CONFIG_HOME/zig-dnssec/config.toml`
 
-Fallback: `$HOME/.config/{{PACKAGE_NAME}}/config.toml`
+Fallback: `$HOME/.config/zig-dnssec/config.toml`
 
 == Health Checks
 
@@ -92,11 +91,11 @@ just run --selftest  # Built-in self-test
 [source,bash]
 ----
 git pull
-just build-release
+just build
 just install --prefix=/usr/local
 ----
 
-Or via OPSM: `opsm update {{PACKAGE_NAME}}`
+Or via OPSM: `opsm update zig-dnssec`
 
 == Security Notes
 
@@ -111,13 +110,13 @@ For deploying multiple instances (e.g., different users or tenants):
 
 [source,bash]
 ----
-just install --prefix=/opt/{{PACKAGE_NAME}}-instance1 --config=/etc/{{PACKAGE_NAME}}/instance1.toml
-just install --prefix=/opt/{{PACKAGE_NAME}}-instance2 --config=/etc/{{PACKAGE_NAME}}/instance2.toml
+just install --prefix=/opt/zig-dnssec-instance1 --config=/etc/zig-dnssec/instance1.toml
+just install --prefix=/opt/zig-dnssec-instance2 --config=/etc/zig-dnssec/instance2.toml
 ----
 
 Each instance has isolated config, data, and logs.
 
 == Reporting Issues
 
-* Upstream: https://github.com/hyperpolymath/rsr-template-repo/issues
+* Upstream: https://github.com/hyperpolymath/zig-dnssec/issues
 * With diagnostic: `just help-me` (pre-fills context)
