@@ -516,3 +516,332 @@ test "negative: an RRSIG naming an insecure zone as signer proves nothing" {
         try expectBogus(records, "www.ecdsa256.test.", .a, null);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Review findings: attacker-controlled RRSIG ordering, signer names, Labels
+// and TTLs, and the closest-trust-anchor rule (RFC 4035 §5.2).
+// ---------------------------------------------------------------------------
+
+const Section = lib.wire.message.Section;
+const Rr = lib.wire.message.Rr;
+
+/// A rebuilt response: the question replaced, one extra record inserted before
+/// or after the records of a section, and/or every received TTL in a section
+/// overwritten. None of these touch a signature — that is the point. The
+/// question, the TTL field and the order and number of RRSIGs are all under the
+/// responder's control and none of them is covered by an RRSIG.
+const Rewrite = struct {
+    question: ?struct { name: []const u8, qtype: Type } = null,
+    prepend: ?struct { sec: Section, rr: Rr } = null,
+    append: ?struct { sec: Section, rr: Rr } = null,
+    ttl: ?struct { sec: Section, value: u32 } = null,
+};
+
+fn rewrite(gpa: std.mem.Allocator, bytes: []const u8, rw: Rewrite) ![]u8 {
+    var msg = try Message.parse(gpa, bytes);
+    defer msg.deinit();
+    const out = try gpa.alloc(u8, 65535);
+    errdefer gpa.free(out);
+    var b = try lib.wire.Builder.init(out, msg.header);
+    if (rw.question) |q| {
+        try b.question(try Name.fromText(q.name), q.qtype, .in);
+    } else {
+        for (msg.questions) |qq| try b.question(qq.name, qq.qtype, qq.qclass);
+    }
+    const sections = [_]Section{ .answer, .authority, .additional };
+    for (sections) |sec| {
+        if (rw.prepend) |p| if (p.sec == sec) try b.record(sec, p.rr);
+        for (msg.section(sec)) |rr| {
+            if (rw.ttl) |t| if (t.sec == sec and rr.type != .opt) {
+                var copy = rr;
+                copy.ttl = t.value;
+                try b.record(sec, copy);
+                continue;
+            };
+            try b.record(sec, rr);
+        }
+        if (rw.append) |ap| if (ap.sec == sec) try b.record(sec, ap.rr);
+    }
+    if (msg.edns) |e| try b.opt(e.udp_size, e.do_bit, e.options);
+    const wire = b.finish();
+    return gpa.realloc(out, wire.len);
+}
+
+/// Finds the (only) record of `t` in `sec` of a recorded response.
+fn findRr(gpa: std.mem.Allocator, bytes: []const u8, sec: Section, t: Type) !Rr {
+    var msg = try Message.parse(gpa, bytes);
+    defer msg.deinit();
+    for (msg.section(sec)) |rr| if (rr.type == t) {
+        return .{
+            .name = rr.name,
+            .type = rr.type,
+            .class = rr.class,
+            .ttl = rr.ttl,
+            .rdata = try gpa.dupe(u8, rr.rdata),
+        };
+    };
+    return error.NoSuchRecord;
+}
+
+/// A forged RRSIG derived from `sig` by rewriting fields the signature covers.
+/// It never verifies; it only has to *name* what the attacker wants named.
+fn forgedSig(gpa: std.mem.Allocator, sig: Rr, labels: ?u8, signer: ?[]const u8) !Rr {
+    const parsed = try lib.wire.rdata.Rrsig.parse(sig.rdata);
+    var rd = try gpa.dupe(u8, sig.rdata);
+    if (labels) |l| rd[3] = l;
+    if (signer) |s| {
+        const n = try Name.fromText(s);
+        const out = try gpa.alloc(u8, 18 + n.len + parsed.signature.len);
+        @memcpy(out[0..18], sig.rdata[0..18]);
+        @memcpy(out[18..][0..n.len], n.bytes());
+        @memcpy(out[18 + n.len ..], parsed.signature);
+        rd = out;
+    }
+    return .{ .name = sig.name, .type = .rrsig, .class = sig.class, .ttl = sig.ttl, .rdata = rd };
+}
+
+/// island.test. is signed but has no DS in test.: from the root anchor alone it
+/// is a proven insecure delegation. Anchoring it turns it into a secure island
+/// (RFC 4035 §5.2), which is the configuration these tests exercise.
+const island_dnskey = "island.test. 3600 IN DNSKEY 257 3 13 O2BGSZFEbAKy5NdvF4kdLuY+duAOTQMj5FMG31B4EVfyiOpVarKoj3KRpabXfTAq4gc4mbJlxf/dvg1VzMOmfg==\n";
+
+fn anchoredAt(gpa: std.mem.Allocator, owner: []const u8) ![]const u8 {
+    // The same key material, asserted at a different owner: an island anchor
+    // below the insecure delegation.
+    const rest = std.mem.indexOfScalar(u8, island_dnskey, ' ').?;
+    return std.fmt.allocPrint(gpa, "{s}{s} {s}", .{ anchor_src, owner, island_dnskey[rest + 1 ..] });
+}
+
+test "positive: an anchored island below an insecure delegation validates as secure" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const island = try corpus.find("island.test.", .dnskey);
+    const www = try corpus.find("www.island.test.", .a);
+    const records = try merged(a, www.records, island.records);
+    const anchors = try std.fmt.allocPrint(a, "{s}{s}", .{ anchor_src, island_dnskey });
+
+    // Without the island anchor this is a proven insecure delegation.
+    {
+        var r = try resolveWith(records, anchor_src, www.qname, .a, .{}, now);
+        defer r.deinit();
+        try testing.expectEqual(validator.Security.insecure, r.security());
+        try testing.expectEqual(validator.Reason.insecure_delegation, r.verdict.insecure.reason);
+    }
+    // With it, the island's own key authenticates the answer: secure, and the
+    // closest-anchor rule below must not cost us that.
+    {
+        var r = try resolveWith(records, anchors, www.qname, .a, .{}, now);
+        defer r.deinit();
+        if (r.security() != .secure) {
+            std.debug.print("anchored island: expected secure, got {t}\n", .{r.security()});
+            return error.TestUnexpectedResult;
+        }
+    }
+}
+
+test "negative: an RRSIG naming an insecure ancestor cannot bypass a closer island anchor" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const www = try corpus.find("www.island.test.", .a);
+    // An island anchor strictly below the insecure delegation at island.test.
+    const anchors = try anchoredAt(a, "www.island.test.");
+
+    // The responder tampers with the address and leaves the real RRSIG, which
+    // names island.test. - a zone that is provably insecure from the root
+    // anchor. zoneStatus(island.test.) says "insecure", and that used to be
+    // enough to hand the unverified answer back as `.insecure`, i.e. usable,
+    // without honouring the closer anchor for the owner.
+    const tampered = try mutate(a, try recorded(www.records, "www.island.test.", .a), .tamper_a);
+    const first = [_]transport.Recorded{.{ .qname = www.qname, .qtype = .a, .response = tampered }};
+    const records = try merged(a, &first, www.records);
+
+    var r = try resolveWith(records, anchors, try Name.fromText("www.island.test."), .a, .{}, now);
+    defer r.deinit();
+    if (r.security() == .insecure) {
+        std.debug.print("tampered answer accepted as insecure (zone {}); expected refusal\n", .{r.verdict.insecure.zone});
+        return error.TestUnexpectedResult;
+    }
+    try testing.expectEqual(validator.Security.bogus, r.security());
+    try testing.expectEqual(validator.Reason.bad_signer, r.verdict.bogus.reason);
+}
+
+test "negative: a forged denial signer cannot bypass a closer island anchor" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const nx = try corpus.find("nx.island.test.", .a);
+    const anchors = try anchoredAt(a, "www.island.test.");
+
+    // island.test.'s own NXDOMAIN proof, re-questioned as a NODATA for a name
+    // inside the configured island. The NSEC RRSIGs name island.test., which is
+    // insecure from the root anchor; the signer used to be read from that
+    // unauthenticated name and the denial accepted as proof of insecurity
+    // *before any signature over the denial records was checked*.
+    const forged = try rewrite(a, try recorded(nx.records, "nx.island.test.", .a), .{
+        .question = .{ .name = "www.island.test.", .qtype = .mx },
+    });
+    const first = [_]transport.Recorded{.{ .qname = try Name.fromText("www.island.test."), .qtype = .mx, .response = forged }};
+    const records = try merged(a, &first, nx.records);
+
+    var r = try resolveWith(records, anchors, try Name.fromText("www.island.test."), .mx, .{}, now);
+    defer r.deinit();
+    if (r.security() == .insecure) {
+        std.debug.print("forged NXDOMAIN accepted as insecure (reason {t}); expected refusal\n", .{r.verdict.insecure.reason});
+        return error.TestUnexpectedResult;
+    }
+}
+
+test "negative: an extra DS RRSIG naming another ancestor cannot break a valid chain" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const s = try corpus.find("www.rsasha256.test.", .a);
+
+    // The DS RRset for rsasha256.test. is validly signed by test. Prepending
+    // one extraneous RRSIG over the same DS that names the root made the old
+    // code pick `sigs[0]` and only that signer: it loaded the root's keys, the
+    // real signature from test. was never tried, and an otherwise valid chain
+    // came back bogus. An untrusted upstream could do that at will.
+    const ds_resp = try recorded(s.records, "rsasha256.test.", .ds);
+    const real = try findRr(a, ds_resp, .answer, .rrsig);
+    const forged = try forgedSig(a, real, null, ".");
+    const evil_ds = try rewrite(a, ds_resp, .{ .prepend = .{ .sec = .answer, .rr = forged } });
+
+    // Sanity: the forged RRSIG is really first, and really names the root.
+    {
+        const first_sig = try findRr(a, evil_ds, .answer, .rrsig);
+        const parsed = try lib.wire.rdata.Rrsig.parse(first_sig.rdata);
+        try testing.expect(parsed.signer.isRoot());
+    }
+
+    const records = try withResponse(a, s.records, "rsasha256.test.", .ds, evil_ds);
+    var r = try resolveWith(records, anchor_src, s.qname, .a, .{}, now);
+    defer r.deinit();
+    if (r.security() != .secure) {
+        std.debug.print("valid chain broken by an extraneous DS RRSIG: got {t}\n", .{r.security()});
+        return error.TestUnexpectedResult;
+    }
+}
+
+/// Replaces the recorded response for (qname, qtype).
+fn withResponse(a: std.mem.Allocator, records: []const transport.Recorded, qname: []const u8, qtype: Type, response: []const u8) ![]transport.Recorded {
+    const n = try Name.fromText(qname);
+    const out = try a.dupe(transport.Recorded, records);
+    var hit = false;
+    for (out) |*r| {
+        if (r.qtype == qtype and r.qname.eql(&n)) {
+            r.response = response;
+            hit = true;
+        }
+    }
+    if (!hit) return error.NothingToReplace;
+    return out;
+}
+
+test "negative: a forged same-signer RRSIG cannot change the wildcard Labels" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const s = try corpus.find("foo.wild.rsasha256.test.", .a);
+    const resp = try recorded(s.records, "foo.wild.rsasha256.test.", .a);
+
+    // The answer is a wildcard expansion of *.wild.rsasha256.test.: the real
+    // RRSIG carries Labels=3 for a 4-label owner, and the response brings the
+    // NSEC that proves the expansion. Appending a second RRSIG by the *same*
+    // signer with Labels=2 used to make the validator take the smaller of the
+    // two, so a valid answer was judged a wildcard expansion at the wrong depth
+    // and rejected for want of a proof nobody was obliged to send.
+    const real = try findRr(a, resp, .answer, .rrsig);
+    try testing.expectEqual(@as(u8, 3), (try lib.wire.rdata.Rrsig.parse(real.rdata)).labels);
+    const forged = try forgedSig(a, real, 2, null);
+    const evil = try rewrite(a, resp, .{ .append = .{ .sec = .answer, .rr = forged } });
+
+    const records = try withResponse(a, s.records, "foo.wild.rsasha256.test.", .a, evil);
+    var r = try resolveWith(records, anchor_src, s.qname, .a, .{}, now);
+    defer r.deinit();
+    if (r.security() != .secure) {
+        std.debug.print("wildcard answer rejected because of a forged Labels field: got {t}\n", .{r.security()});
+        return error.TestUnexpectedResult;
+    }
+}
+
+test "negative: an insecure answer cannot outlive the proof that allowed it" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const www = try corpus.find("www.island.test.", .a);
+    const resp = try recorded(www.records, "www.island.test.", .a);
+
+    // The received TTL is not signed; the RRSIG's Original TTL is. An on-path
+    // responder can therefore raise the TTL of unsigned data it is serving as
+    // `insecure`, and the C ABI hands that number to the caller as the answer's
+    // cache duration. The proof that made the data acceptable - test.'s NSEC3
+    // showing no DS for island.test. - has its own, much shorter lifetime, and
+    // the answer must not outlive it.
+    const evil = try rewrite(a, resp, .{ .ttl = .{ .sec = .answer, .value = 86400 } });
+    const records = try withResponse(a, www.records, "www.island.test.", .a, evil);
+
+    var r = try resolveWith(records, anchor_src, www.qname, .a, .{}, now);
+    defer r.deinit();
+    try testing.expectEqual(validator.Security.insecure, r.security());
+    try testing.expectEqual(validator.Reason.insecure_delegation, r.verdict.insecure.reason);
+    const ttl = r.verdict.insecure.answer.ttl;
+    // The proof's own TTL in these fixtures is 1s (Unbound ran with
+    // cache-max-ttl=1); the forged data TTL is 86400s.
+    if (ttl >= 86400) {
+        std.debug.print("insecure answer cached for {d}s, the attacker-chosen TTL\n", .{ttl});
+        return error.TestUnexpectedResult;
+    }
+    try testing.expect(ttl <= 300);
+}
+
+test "negative: for QTYPE=CNAME a synthesised CNAME below a DNAME is the answer" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const s = try corpus.find("www.redir.dname.test.", .a);
+    const resp = try recorded(s.records, "www.redir.dname.test.", .a);
+
+    // RFC 6672 §5.3.1: redir.dname.test. DNAME rsasha256.test. makes the
+    // server synthesise www.redir.dname.test. CNAME www.rsasha256.test. For
+    // QTYPE=CNAME that synthesised record *is* the answer. The validator used
+    // to redirect past it and look for a CNAME at the target, which a correct
+    // response does not carry, so a valid answer came back bogus for want of a
+    // NODATA proof nobody was obliged to send.
+    const cname_resp = try rewrite(a, resp, .{ .question = .{ .name = "www.redir.dname.test.", .qtype = .cname } });
+    const first = [_]transport.Recorded{.{ .qname = try Name.fromText("www.redir.dname.test."), .qtype = .cname, .response = cname_resp }};
+    const records = try merged(a, &first, s.records);
+
+    var r = try resolveWith(records, anchor_src, try Name.fromText("www.redir.dname.test."), .cname, .{}, now);
+    defer r.deinit();
+    if (r.security() != .secure) {
+        std.debug.print("QTYPE=CNAME below a DNAME: expected secure, got {t}\n", .{r.security()});
+        return error.TestUnexpectedResult;
+    }
+    // The chain is the authenticated DNAME plus the synthesised CNAME, and it
+    // stops at the original name: the target is not chased for this qtype.
+    const ans = r.verdict.secure;
+    try testing.expectEqual(@as(usize, 2), ans.rrsets.len);
+    try testing.expectEqual(Type.dname, ans.rrsets[0].type);
+    try testing.expectEqual(Type.cname, ans.rrsets[1].type);
+    try testing.expect(ans.final_name.eql(&(try Name.fromText("www.redir.dname.test."))));
+}
+
+test "negative: QTYPE=RRSIG is refused rather than misreported" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const s = try corpus.find("www.rsasha256.test.", .a);
+    // `group` reads every RRSIG as a signature and never as data, so an RRSIG
+    // answer groups into no RRset at all and would be judged as NODATA. Nothing
+    // signs an RRSIG RRset, so there is no verdict to give: refuse the query
+    // type instead of reporting a correctly signed response as bogus.
+    const resp = try rewrite(a, try recorded(s.records, "www.rsasha256.test.", .a), .{
+        .question = .{ .name = "www.rsasha256.test.", .qtype = .rrsig },
+    });
+    const first = [_]transport.Recorded{.{ .qname = s.qname, .qtype = .rrsig, .response = resp }};
+    const records = try merged(a, &first, s.records);
+    try expectBogus(records, "www.rsasha256.test.", .rrsig, .malformed_response);
+}
