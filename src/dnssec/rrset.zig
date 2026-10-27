@@ -44,6 +44,13 @@ pub const Grouped = struct {
 
 /// Groups records into RRsets (same owner, type, class) and attaches the
 /// RRSIGs that cover each one.
+///
+/// Every RRSIG record is read as a *signature* and never as data, so a
+/// QTYPE=RRSIG answer is grouped into no RRset at all (its records land in
+/// `orphan_sigs`). That is deliberate: nothing signs an RRSIG RRset, so there
+/// is no way to authenticate one, and a positive answer would be
+/// indistinguishable from a NODATA denial. Callers must reject QTYPE=RRSIG
+/// before validating — `validator.validateResponse` and the C ABI both do.
 pub fn group(a: Allocator, rrs: []const message.Rr) Allocator.Error!Grouped {
     var sets: std.ArrayList(RrSet) = .empty;
     var members: std.ArrayList(std.ArrayList([]const u8)) = .empty;
@@ -220,12 +227,23 @@ pub fn verify(
 }
 
 /// TTL to report for a validated RRset (RFC 4035 §5.3.3): no more than the
-/// received TTL, the RRSIG's Original TTL, or the time left until expiry.
-pub fn effectiveTtl(set: *const RrSet, sig: *const Sig, now: u32) u32 {
+/// received TTL, the RRSIG's Original TTL, or the time left until this
+/// signature stops being acceptable.
+///
+/// "Stops being acceptable" is the expiration *widened by `skew`*, because
+/// `checkTime` accepts a signature for that long. Measuring to the bare
+/// expiration instead makes an already-expired signature — one accepted only
+/// inside the skew window — wrap to a huge remaining lifetime in RFC 1982
+/// arithmetic, so the answer would advertise a cache lifetime of hours while
+/// the signature is only good for the seconds of skew left.
+pub fn effectiveTtl(set: *const RrSet, sig: *const Sig, now: u32, skew: u32) u32 {
     var ttl = @min(set.ttl, sig.rrsig.original_ttl);
     ttl = @min(ttl, sig.ttl);
-    const left = sig.rrsig.expiration -% now;
-    if (left < 0x8000_0000) ttl = @min(ttl, left);
+    const acceptable_until = sig.rrsig.expiration +% skew;
+    const left = acceptable_until -% now;
+    // A successful `checkTime` guarantees `left < 2^31`; the zero below is the
+    // fail-closed value if this is ever reached with an unacceptable signature.
+    if (left < 0x8000_0000) ttl = @min(ttl, left) else ttl = 0;
     return ttl;
 }
 
@@ -255,4 +273,58 @@ test "wildcard signing owner" {
     const same = try signingOwner(&n, 3);
     try testing.expectEqualStrings("a.b.example.", same.toText(&buf));
     try testing.expectError(error.BadLabelCount, signingOwner(&n, 4));
+}
+
+/// An RRSIG RDATA over A/IN, signed by the root, with a one-octet signature.
+/// Only the fields `effectiveTtl` reads are meaningful; the signature itself
+/// is never checked here.
+fn sigRdata(original_ttl: u32, inception: u32, expiration: u32) [20]u8 {
+    var rd: [20]u8 = undefined;
+    std.mem.writeInt(u16, rd[0..2], 1, .big); // covers A
+    rd[2] = 8; // RSASHA256
+    rd[3] = 1; // labels
+    std.mem.writeInt(u32, rd[4..8], original_ttl, .big);
+    std.mem.writeInt(u32, rd[8..12], expiration, .big);
+    std.mem.writeInt(u32, rd[12..16], inception, .big);
+    std.mem.writeInt(u16, rd[16..18], 1234, .big);
+    rd[18] = 0; // signer = root
+    rd[19] = 0xAA;
+    return rd;
+}
+
+test "effectiveTtl is bounded by the window the signature is actually accepted in" {
+    const owner = try Name.fromText("a.");
+    const rdatas = [_][]const u8{&.{ 1, 2, 3, 4 }};
+    var rd = sigRdata(3600, 1_000, 2_000);
+    const sig: Sig = .{ .rrsig = try rdata.Rrsig.parse(&rd), .rdata = &rd, .ttl = 3600 };
+    const set: RrSet = .{ .name = owner, .type = .a, .class = .in, .ttl = 3600, .rdatas = &rdatas, .sigs = &.{sig} };
+
+    // checkTime agrees the signature is acceptable at each instant below, so
+    // the TTL bound and the validity window cannot disagree.
+    try testing.expectEqual(TimeStatus.valid, checkTime(1_000, 2_000, 1_000, 0));
+    try testing.expectEqual(@as(u32, 1_000), effectiveTtl(&set, &sig, 1_000, 0));
+
+    // Expired, but accepted because the configured skew still covers it: 50
+    // seconds of skew remain. The answer must not outlive that. Measuring to
+    // the bare expiration instead made `expiration -% now` wrap to 0xFFFFFFCE,
+    // which is >= 2^31, so the bound was skipped and the caller was told the
+    // answer was cacheable for the full received TTL of an hour.
+    try testing.expectEqual(TimeStatus.valid, checkTime(1_000, 2_000, 2_050, 100));
+    try testing.expectEqual(@as(u32, 50), effectiveTtl(&set, &sig, 2_050, 100));
+
+    // The same instant with no skew is simply expired: fail closed at zero
+    // rather than at a large TTL.
+    try testing.expectEqual(TimeStatus.expired, checkTime(1_000, 2_000, 2_050, 0));
+    try testing.expectEqual(@as(u32, 0), effectiveTtl(&set, &sig, 2_050, 0));
+
+    // The received TTL and the RRSIG's Original TTL still cap the result.
+    var rd2 = sigRdata(60, 1_000, 2_000);
+    const sig2: Sig = .{ .rrsig = try rdata.Rrsig.parse(&rd2), .rdata = &rd2, .ttl = 3600 };
+    try testing.expectEqual(@as(u32, 60), effectiveTtl(&set, &sig2, 1_000, 0));
+
+    // Serial wrap-around (RFC 1982): expiry just past 2^32.
+    var rd3 = sigRdata(3600, 0xFFFF_FF00, 0x0000_0100);
+    const sig3: Sig = .{ .rrsig = try rdata.Rrsig.parse(&rd3), .rdata = &rd3, .ttl = 3600 };
+    try testing.expectEqual(TimeStatus.valid, checkTime(0xFFFF_FF00, 0x0000_0100, 0, 0));
+    try testing.expectEqual(@as(u32, 0x100), effectiveTtl(&set, &sig3, 0, 0));
 }

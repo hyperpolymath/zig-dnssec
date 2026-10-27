@@ -55,6 +55,9 @@ const L = struct {
     const naptr: []const Field = &.{ .{ .fixed = 4 }, .char_string, .char_string, .char_string, .name };
     const rrsig: []const Field = &.{ .{ .fixed = 18 }, .name, .rest };
     const nsec: []const Field = &.{ .name, .rest };
+    // RFC 9460 §2.2: SvcPriority (2 octets), TargetName, then the SvcParams
+    // (which carry no domain names — §2.4.3 forbids embedding one).
+    const svcb: []const Field = &.{ .{ .fixed = 2 }, .name, .rest };
 };
 
 /// The layout for types that embed domain names, or null for types whose
@@ -77,6 +80,11 @@ pub fn layoutOf(t: Type) ?Layout {
         .rrsig => .{ .fields = L.rrsig, .decompress = false, .lowercase_names = true },
         // RFC 6840 §5.1: NSEC next-domain names are NOT lowercased.
         .nsec => .{ .fields = L.nsec, .decompress = false, .lowercase_names = false },
+        // RFC 9460 §2.4.2: the SVCB/HTTPS TargetName MUST NOT be compressed.
+        // It is still a domain name, so DNSSEC canonical form lowercases it
+        // (RFC 4034 §6.2). Treating these types as opaque made a valid
+        // signature over a TargetName with any uppercase ASCII fail.
+        .svcb, .https => .{ .fields = L.svcb, .decompress = false, .lowercase_names = true },
         else => null,
     };
 }
@@ -591,4 +599,63 @@ test "canonicalize lowercases RRSIG signer but not NSEC next name" {
     var mx = [_]u8{ 0, 10, 2, 'M', 'X', 0 };
     var out3: [mx.len]u8 = undefined;
     try testing.expectEqualSlices(u8, &[_]u8{ 0, 10, 2, 'm', 'x', 0 }, try canonicalize(.mx, &mx, &out3));
+}
+
+test "canonicalize lowercases the SVCB and HTTPS TargetName" {
+    // RFC 9460 §2.2: SvcPriority (2), TargetName, SvcParams. The TargetName is
+    // a domain name, so RFC 4034 §6.2 puts it in lowercase canonical form;
+    // treating the whole RDATA as opaque made a valid signature over an
+    // uppercase TargetName fail to verify.
+    //   1 SVCB.EXAMPLE. alpn="h2,h3"
+    const rd = [_]u8{
+        0x00, 0x01, //  SvcPriority 1 (ServiceMode)
+        0x04, 'S',
+        'V',  'C',
+        'B',  0x07,
+        'E',  'X',
+        'A',  'M',
+        'P',  'L',
+        'E',
+        0x00, //      root label
+        0x00, 0x01, 0x00, 0x06, 'h', '2', ',', 'h', '3', // alpn
+    };
+    var out: [rd.len]u8 = undefined;
+    const want = [_]u8{
+        0x00, 0x01,
+        0x04, 's',
+        'v',  'c',
+        'b',  0x07,
+        'e',  'x',
+        'a',  'm',
+        'p',  'l',
+        'e',  0x00,
+        0x00, 0x01,
+        0x00, 0x06,
+        'h',  '2',
+        ',',  'h',
+        '3',
+    };
+    try testing.expectEqualSlices(u8, &want, try canonicalize(.svcb, &rd, &out));
+    try testing.expectEqualSlices(u8, &want, try canonicalize(.https, &rd, &out));
+    // Only the name is touched: the SvcParams after it (16 octets in) are
+    // opaque and keep their case, so an alpn value is not corrupted.
+    try testing.expectEqualSlices(u8, rd[16..], out[16..]);
+
+    // AliasMode ("1 a." with no parameters): the target is still lowercased.
+    const alias = [_]u8{ 0x00, 0x01, 0x01, 'A', 0x00 };
+    var out2: [alias.len]u8 = undefined;
+    try validate(.svcb, &alias);
+    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x01, 0x01, 'a', 0x00 }, try canonicalize(.svcb, &alias, &out2));
+    // Priority octets alone, with no TargetName, are not a valid SVCB.
+    try testing.expectError(error.Truncated, validate(.svcb, &[_]u8{ 0x00, 0x01 }));
+    // Fewer than the two priority octets.
+    try testing.expectError(error.MalformedRdata, validate(.https, &[_]u8{0x00}));
+
+    // RFC 9460 §2.4.2: the TargetName MUST NOT be compressed.
+    const compressed = [_]u8{ 0x00, 0x01, 0xC0, 0x0C };
+    var buf: [64]u8 = undefined;
+    try testing.expectError(error.CompressionForbidden, expand(&compressed, 0, compressed.len, .svcb, &buf));
+    // Uncompressed, `expand` round-trips it unchanged.
+    var buf2: [rd.len]u8 = undefined;
+    try testing.expectEqualSlices(u8, &rd, try expand(&rd, 0, rd.len, .https, &buf2));
 }

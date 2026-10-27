@@ -197,13 +197,19 @@ pub const Name = struct {
         if (label_len > 0) try out.appendLabel(lbl[0..label_len]);
         if (!absolute) {
             if (origin) |o| {
-                if (out.len + o.len > max_wire_len) return error.NameTooLong;
+                // `Name.len` is a u8 and `max_wire_len` is 255, so the sum MUST
+                // be taken in usize: two names that are each individually valid
+                // can still exceed 255 octets when joined, and `out.len + o.len`
+                // in u8 would wrap (panic in Debug/ReleaseSafe, silently
+                // underflow in unchecked builds) instead of being rejected.
+                const joined = @as(usize, out.len) + @as(usize, o.len);
+                if (joined > max_wire_len) return error.NameTooLong;
                 @memcpy(out.buf[out.len..][0..o.len], o.bytes());
-                out.len += o.len;
+                out.len = @intCast(joined);
                 return out;
             }
         }
-        if (out.len + 1 > max_wire_len) return error.NameTooLong;
+        if (@as(usize, out.len) + 1 > max_wire_len) return error.NameTooLong;
         out.buf[out.len] = 0;
         out.len += 1;
         return out;
@@ -609,4 +615,59 @@ test "regression (fuzzer): labels reaching exactly 255 octets without a root lab
     pos = 12;
     const n = try Name.readFromMessage(&msg, &pos);
     try testing.expectEqual(@as(u8, 255), n.len);
+}
+
+test "regression: relative name joined to its origin cannot overflow the u8 length" {
+    // Both halves are individually valid names; only their sum exceeds 255
+    // octets. `Name.len` is a u8, so the old `out.len + o.len > max_wire_len`
+    // wrapped instead of comparing: in Debug/ReleaseSafe the arithmetic
+    // panicked, and in an unchecked build the memcpy that followed ran off the
+    // end of the 255-octet buffer. This is reachable from the zone and
+    // trust-anchor parsers, which join relative owners to $ORIGIN.
+    var text: [512]u8 = undefined;
+    var n: usize = 0;
+    // Relative part: 5 labels of 3 octets = 20 octets.
+    for (0..5) |_| {
+        text[n] = 'a';
+        text[n + 1] = 'a';
+        text[n + 2] = 'a';
+        text[n + 3] = '.';
+        n += 4;
+    }
+    const relative = text[0 .. n - 1]; // "aaa.aaa.aaa.aaa.aaa" (no trailing dot)
+    var origin_text: [512]u8 = undefined;
+    var m: usize = 0;
+    // Origin: 60 labels of 3 octets + root = 241 octets (a valid Name).
+    for (0..60) |_| {
+        origin_text[m] = 'b';
+        origin_text[m + 1] = 'b';
+        origin_text[m + 2] = 'b';
+        origin_text[m + 3] = '.';
+        m += 4;
+    }
+    const origin = try Name.fromText(origin_text[0..m]);
+    try testing.expectEqual(@as(u8, 241), origin.len);
+
+    // 20 + 241 = 261 > 255: rejected, not overflowed.
+    try testing.expectError(error.NameTooLong, Name.fromTextRelative(relative, &origin));
+
+    // 58 of those labels give a 233-octet origin, and 20 + 233 = 253 fits:
+    // the boundary is the sum, not either half, so both sides must be exercised.
+    const short_origin = try Name.fromText(origin_text[0 .. m - 8]);
+    try testing.expectEqual(@as(u8, 233), short_origin.len);
+    const joined = try Name.fromTextRelative(relative, &short_origin);
+    try testing.expectEqual(@as(u8, 253), joined.len);
+    try testing.expect(std.mem.endsWith(u8, joined.bytes(), short_origin.bytes()));
+
+    // An absolute name ignores the origin and is bounded on its own.
+    var abs_text: [512]u8 = undefined;
+    var k: usize = 0;
+    for (0..64) |_| {
+        abs_text[k] = 'c';
+        abs_text[k + 1] = 'c';
+        abs_text[k + 2] = 'c';
+        abs_text[k + 3] = '.';
+        k += 4;
+    }
+    try testing.expectError(error.NameTooLong, Name.fromTextRelative(abs_text[0..k], &short_origin));
 }
