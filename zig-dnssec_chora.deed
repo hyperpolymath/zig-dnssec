@@ -1051,9 +1051,11 @@
     :version "1.0.0"
     :spec "rsr-criteria-v2"
     :declares-against "2.1.1-draft"
-    ; UNASSIGNED: declare capabilities (or a preset) — see standards
-    ; .machine_readable/template-capability-gates.toml
-    :capabilities ())
+    ; Declared against standards .machine_readable/template-capability-gates.toml
+    ; (vocabulary 0.3.0) and checked with standards scripts/check-rsr-profile.sh.
+    ; Each capability names a surface this tree carries; add one only with
+    ; the module it gates.
+    :capabilities ("zig" "idris2" "bash" "library" "ffi" "abi" "container" "reproducible-build" "benchmarks" "governance-tier" "published-package" "formal-proofs"))
   ; variant — provenance contract (ADR-0002 shape; ADR-0003 use).
   ; Records what this repo was minted from so the drift gate
   ; (scripts/check-variant-drift.sh <parent-checkout>) and future
