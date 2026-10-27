@@ -242,6 +242,23 @@ response.
 
 == Findings outside this code
 
+* *The repo deed's template pin cannot be fetched, so the variant-drift gate
+  cannot be run.* `(provenance :template-commit)` and `(variant :parent-pin)`
+  both name `3100d46b9cfee83317018f1e8244b2fafa9da660`, and
+  `:template-branch` names `init/repo-init`. Neither exists in
+  `hyperpolymath/rsr-template-repo`: the commit returns HTTP 422 from the
+  commits API and is reachable from no branch, and the branch is gone (the
+  parent carries only `main` and two work branches, `main` last pushed
+  2026-10-27). `scripts/check-variant-drift.sh` takes a parent checkout at
+  that pin as its argument, so the gate is *unrunnable*, not failing. Run
+  against the parent's current `main` instead it reports 137 lines of drift,
+  which measures fourteen days of parent evolution since the 2026-10-13 mint
+  mixed with this repo's real divergence, and is not actionable either way.
+  Re-pointing the pin at today's parent tip and rewriting the path lists to
+  make the gate green would certify convergence that has not been
+  demonstrated, so it is left for the estate owner: either re-publish the pin
+  or re-derive the contract deliberately. `check-template-conformance.sh` T3
+  asserts the same unfetchable commit and inherits the problem.
 * *Zig 0.17.0 `std.http.Client` + CONNECT proxy sends HTTPS requests in cleartext*
   (`docs/developer/ZIG-STD-SURVEY.adoc`). Worth an upstream report.
 * *RFC 8080 §6*: the example signatures carry Labels=3 for a two-label owner, which a
