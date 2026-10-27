@@ -42,7 +42,7 @@ RUN --mount=type=secret,id=extra-ca,required=false \
       aarch64) sum="$ZIG_SHA256_AARCH64" ;; \
       *) echo "unsupported architecture $arch" >&2; exit 1 ;; \
     esac; \
-    curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-${arch}-linux-${ZIG_VERSION}.tar.xz"; \
+    curl -fsSL --proto '=https' --tlsv1.2 -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-${arch}-linux-${ZIG_VERSION}.tar.xz"; \
     echo "${sum}  /tmp/zig.tar.xz" | sha256sum -c -; \
     xz -dc /tmp/zig.tar.xz | tar -x -C /opt; \
     mv "/opt/zig-${arch}-linux-${ZIG_VERSION}" /opt/zig; \
@@ -67,7 +67,10 @@ RUN --mount=type=secret,id=extra-ca,required=false \
     fi; \
     apk add --no-cache bash nsd unbound ldns-tools haproxy bind-tools openssl gawk; \
     rm -f /tmp/ca.pem
-CMD ["bash", "-c", "tests/crosscheck/servers.sh start && tests/crosscheck/run.sh; tests/crosscheck/servers.sh stop"]
+# The cross-check's own exit status, not the teardown's. `A && B; C` exits with
+# C, and `servers.sh stop` normally succeeds, so a failed setup or a failed
+# cross-check used to report success from this container.
+CMD ["bash", "-c", "rc=0; { tests/crosscheck/servers.sh start && tests/crosscheck/run.sh; } || rc=$?; tests/crosscheck/servers.sh stop; sc=$?; if [ \"$rc\" -eq 0 ]; then rc=$sc; fi; exit \"$rc\""]
 
 # ---------------------------------------------------------------------------
 FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
