@@ -39,9 +39,9 @@ jobs:
           echo "$RUNNER_TEMP/zig-x86_64-linux-${ZIG_VERSION}" >> "$GITHUB_PATH"
 
       - name: Formatting
-        run: zig fmt --check build.zig src/root.zig src/wire src/dnssec src/stub src/cli tests
+        run: zig fmt --check build.zig src/root.zig src/wire src/dnssec src/stub src/cli src/interface/ffi tests
 
-      - name: Unit, RFC-vector, denial, replay and fuzz-corpus tests
+      - name: Unit, RFC-vector, denial, replay, fuzz-corpus and C ABI tests
         run: zig build test --summary all
 
       - name: ReleaseSafe build
@@ -51,3 +51,56 @@ jobs:
         run: |
           zig build fuzz-tool -Doptimize=ReleaseSafe
           ./zig-out/bin/dnssec-fuzz all 20 0x2026
+
+  # The Idris2 side of the ABI seam: typecheck the proofs, then run the
+  # Idris2 -> C ABI -> Zig end-to-end test. Idris2 is built from a pinned
+  # release commit (it has no checksummed binary release).
+  abi-seam:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      ZIG_VERSION: "0.17.0"
+      ZIG_SHA256: "1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026"
+      IDRIS2_TAG: "v0.7.0"
+      IDRIS2_COMMIT: "27780073c8631826d846499840b3857d9b9a4fd5"
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install Zig (checksum-verified)
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -fsSL -o "$RUNNER_TEMP/zig.tar.xz" \
+            "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          echo "${ZIG_SHA256}  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-${ZIG_VERSION}" >> "$GITHUB_PATH"
+
+      - name: Build Idris2 from the pinned release commit
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q chezscheme libgmp-dev
+          git clone -q --depth 1 --branch "$IDRIS2_TAG" https://github.com/idris-lang/Idris2.git "$RUNNER_TEMP/idris2-src"
+          test "$(git -C "$RUNNER_TEMP/idris2-src" rev-parse HEAD)" = "$IDRIS2_COMMIT"
+          make -C "$RUNNER_TEMP/idris2-src" bootstrap SCHEME=chezscheme PREFIX="$RUNNER_TEMP/idris2" -j"$(nproc)"
+          make -C "$RUNNER_TEMP/idris2-src" install PREFIX="$RUNNER_TEMP/idris2"
+          echo "$RUNNER_TEMP/idris2/bin" >> "$GITHUB_PATH"
+
+      # `idris2 --typecheck` can exit 0 with an Error: line (see
+      # scripts/check-proofs.sh), so both are checked.
+      - name: Typecheck the Idris2 ABI model
+        run: |
+          set -euo pipefail
+          out="$(idris2 --typecheck src/interface/abi.ipkg 2>&1)" || { echo "$out"; exit 1; }
+          echo "$out"
+          if echo "$out" | grep -q '^Error'; then exit 1; fi
+
+      - name: Idris2 -> C ABI -> Zig end-to-end test
+        run: |
+          set -euo pipefail
+          zig build ffi
+          idris2 --build src/interface/E2e/abi-e2e.ipkg
+          LD_LIBRARY_PATH=zig-out/lib src/interface/E2e/build/exec/abi-e2e \
+            tests/testdata/crosscheck.traces tests/testdata/crosscheck-root.anchor

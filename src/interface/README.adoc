@@ -1,3 +1,85 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= interface Unit
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= The C ABI seam
+:toc:
+
+The library is used from Zig as a module (`src/root.zig`). Every other language reaches
+it through this seam: a C ABI implemented in Zig, and an Idris2 model of that ABI that
+states its rules as types. It is experimental and unreviewed, like the rest of the
+repository.
+
+== The three parts
+
+[cols="1,2,3",options="header"]
+|===
+| Part | File | Role
+
+| Contract
+| `ffi/include/zig_dnssec.h`
+| The C interface, version 1: codes, the `zig_dnssec_verdict` struct, the transport
+  callback, six functions, and the fail-closed rules in its opening comment.
+
+| Implementation
+| `ffi/src/main.zig`
+| Pure Zig, no libc. Built by `zig build ffi` as `libzig_dnssec.a` and
+  `libzig_dnssec.so` (the shared object exports the six functions and nothing else).
+
+| Model
+| `Abi/Types.idr`, `Abi/Layout.idr`, `Abi/Foreign.idr`
+| Idris2: the codes with round-trip proofs, the struct layout with alignment and
+  no-overlap proofs, and bindings whose result type cannot carry an answer for a bogus
+  or indeterminate verdict.
+|===
+
+== The rule the seam keeps
+
+Answer data leaves the library only with a SECURE verdict (authenticated to a trust
+anchor) or an INSECURE one (proven unsigned, or allowed by an explicit policy flag).
+
+* In C, `verdict.security` is `ZIG_DNSSEC_SECURITY_NONE` (0) unless the call returned
+  `ZIG_DNSSEC_OK`, so a zeroed or stale verdict never reads as secure, and the answer
+  buffer stays the empty string for BOGUS and INDETERMINATE.
+* In Idris2, `Outcome.answer` has type `AnswerFor security`, which is `String` for
+  `Secure` and `Insecure` and `()` otherwise; `answerOf` needs a `Usable` proof that
+  does not exist for `Bogus` or `Indeterminate`. `Abi.Foreign` decodes the security
+  code before it reads any text, so the rule holds for Idris callers even if the
+  library broke it.
+
+== How the parts are kept in step
+
+* The Zig implementation imports the header through translate-c. Each exported
+  function is checked at compile time to have exactly the header's type, and each
+  reason code is looked up by the header macro of the same name, so a validator reason
+  without a macro does not compile.
+* `ffi/test/seam_test.zig` reads the Idris sources and compares every status, security,
+  reason and policy code, every field offset, size and alignment, the struct size, and
+  the parameter kinds of every `%foreign` declaration with the header as the C compiler
+  sees it; it also rejects `believe_me`, `assert_total` and the like in the model.
+  Eleven deliberate mismatches (one per kind) were each caught when this was written.
+* `idris2 --typecheck abi.ipkg` checks the model's proofs (`just test` runs it).
+* `ffi/test/abi_test.zig` exercises the C functions through the header's declarations:
+  verdicts on recorded responses, every bad-argument path, buffer sizing, the callback
+  transport, names, leaks and allocation failure at every point.
+* `E2e/` is an Idris2 program that loads `libzig_dnssec.so` and validates recorded
+  responses through `Abi.Foreign` (`just abi-e2e`).
+
+== Using it
+
+From C: build with `zig build ffi -Doptimize=ReleaseSafe`, include
+`zig-out/include/zig_dnssec.h`, link `zig-out/lib/libzig_dnssec.a` (or the shared
+object). Supply the transport as a callback that sends one DNS message to a resolver
+you trust to pass messages through (DNS-over-HTTPS is the intended carrier) and
+returns the response; the library sets CD and DO and validates everything itself.
+
+From Idris2: `Abi.Foreign.validateTrace` validates against recorded responses. A live
+transport for Idris2 callers is not provided yet (it needs a C callback from Idris2 or
+a DoH entry point in the ABI; see `docs/status/ROADMAP.adoc`).
+
+== Limits
+
+* The Idris2 model reads the struct little-endian and assumes natural alignment; the
+  seam is tested on x86_64 Linux only.
+* What the proofs cover is the model and the decoding in `Abi.Foreign`. That the
+  validator itself never reports a failure as SECURE or INSECURE is tested, not proved
+  (`docs/reports/VERIFICATION.adoc`).
+* The FFI marshalling of the Idris2 Chez backend is trusted.

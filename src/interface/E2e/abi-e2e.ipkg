@@ -1,0 +1,29 @@
+-- SPDX-License-Identifier: MPL-2.0
+-- SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+--
+-- End-to-end test of the seam: an Idris2 program that loads libzig_dnssec
+-- (built by `zig build ffi`) and validates recorded responses through
+-- Abi.Foreign. Run with `just abi-e2e`. It lives one level below abi.ipkg so
+-- that `just test` (which typechecks the first .ipkg it finds) keeps
+-- choosing abi.ipkg.
+
+package abi-e2e
+
+version = 0.1.0
+
+authors = "Jonathan D.A. Jewell"
+
+brief = "End-to-end test of the zig-dnssec Idris2/Zig seam"
+
+sourcedir = ".."
+
+depends = base
+
+modules = Abi.Types
+        , Abi.Layout
+        , Abi.Foreign
+        , E2e.Main
+
+main = E2e.Main
+
+executable = abi-e2e

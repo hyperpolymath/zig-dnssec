@@ -1,3 +1,8 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= abi Logic
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= Idris2 model of the C ABI
+
+`Types.idr` (codes, round trips, what a verdict permits), `Layout.idr` (the verdict
+struct, with alignment and no-overlap proofs) and `Foreign.idr` (bindings and the safe
+wrapper). Typecheck with `idris2 --typecheck src/interface/abi.ipkg`. See
+`../README.adoc`.

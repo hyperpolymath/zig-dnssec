@@ -130,10 +130,9 @@ clean-all: clean
 # TEST & QUALITY
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Run every detected language's tests: `zig build test` covers src/interface/ffi
-# (unit tests in src/main.zig, test/integration_test.zig). It compiles only after
-# `just repo-init` has filled the template tokens, so an un-initialised template
-# fails here loudly instead of reporting a pass over nothing.
+# Run every detected language's tests: `zig build test` (library, C ABI and the
+# Idris2/header consistency checks in src/interface/ffi/test/) and
+# `idris2 --typecheck src/interface/abi.ipkg` (the seam's proofs).
 test: provision::test
 
 # Run tests with verbose output
@@ -145,8 +144,14 @@ test-smoke:
     @echo "FAIL: 'just test-smoke' is not wired yet — no smoke check ran. Edit the 'test-smoke' recipe." >&2; exit 1
 
 # Run end-to-end tests (full pipeline: build → run → verify)
-e2e:
+e2e: abi-e2e
     bash tests/e2e.sh
+
+# Idris2 -> C ABI -> Zig validator, over the recorded fixtures. Needs zig and idris2.
+abi-e2e:
+    zig build ffi
+    idris2 --build src/interface/E2e/abi-e2e.ipkg
+    LD_LIBRARY_PATH=zig-out/lib src/interface/E2e/build/exec/abi-e2e tests/testdata/crosscheck.traces tests/testdata/crosscheck-root.anchor
 
 # Run aspect tests (cross-cutting concern validation)
 aspect:
