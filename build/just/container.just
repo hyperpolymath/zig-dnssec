@@ -34,6 +34,12 @@ _engine := '''
     fi
 '''
 
+# The image reference, shared by build, push and run. It expands the same
+# CT_REGISTRY / CT_TAG overrides, with the same defaults, as
+# build/container/stapeln/ct-build.sh, so the plain-OCI fallback and
+# container-run name exactly the image the stapeln build produces.
+_image := '${CT_REGISTRY:-ghcr.io/hyperpolymath}/zig-dnssec:${CT_TAG:-latest}'
+
 # Initialise container templates — substitute placeholders with project values
 container-init:
     #!/usr/bin/env bash
@@ -59,8 +65,8 @@ container-init:
     fi
 
     # Prompt for container-specific values
-    read -rp "Service name (e.g. my-api) [zig_dnssec]: " _SERVICE_NAME
-    SERVICE_NAME="${_SERVICE_NAME:-zig_dnssec}"
+    read -rp "Service name (e.g. my-api) [zig-dnssec]: " _SERVICE_NAME
+    SERVICE_NAME="${_SERVICE_NAME:-zig-dnssec}"
 
     read -rp "Primary port [8080]: " _PORT
     PORT="${_PORT:-8080}"
@@ -113,9 +119,9 @@ container-build *args:
     if [ -f "build/container/stapeln/ct-build.sh" ]; then
         cd build/container/stapeln && CONTAINER_ENGINE="$ENGINE" ./ct-build.sh {{args}}
     elif [ -f "build/container/Containerfile" ]; then
-        "$ENGINE" build -t zig_dnssec:latest -f build/container/Containerfile .
+        "$ENGINE" build -t "{{_image}}" -f build/container/Containerfile .
     elif [ -f "Containerfile" ]; then
-        "$ENGINE" build -t zig_dnssec:latest -f Containerfile .
+        "$ENGINE" build -t "{{_image}}" -f Containerfile .
     else
         echo "No Containerfile found in build/container/ or project root"
         exit 1
@@ -177,7 +183,7 @@ container-push:
         cd build/container/stapeln && CONTAINER_ENGINE="$ENGINE" ./ct-build.sh --push
     else
         echo "No build/container/stapeln/ct-build.sh found — falling back to $ENGINE push"
-        "$ENGINE" push zig_dnssec:latest
+        "$ENGINE" push "{{_image}}"
     fi
 
 # Run the container interactively (for debugging)
@@ -185,7 +191,7 @@ container-run *args:
     #!/usr/bin/env bash
     set -euo pipefail
     {{_engine}}
-    "$ENGINE" run --rm -it zig_dnssec:latest {{args}}
+    "$ENGINE" run --rm -it "{{_image}}" {{args}}
 
 # Container matrix: [build|run|push|shell|scan] x [registry] x [tag]
 container-matrix action="build" registry="ghcr.io/hyperpolymath" tag="latest":

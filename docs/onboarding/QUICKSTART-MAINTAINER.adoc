@@ -20,7 +20,7 @@ Zig 0.17.0, `just` (1.42 or later), and Idris2 0.7.0 for the ABI model checks th
 ----
 git clone https://github.com/hyperpolymath/zig-dnssec.git
 cd zig-dnssec
-just build-release
+just build
 ----
 
 Output: `zig-out/`
@@ -91,7 +91,7 @@ just run --selftest  # Built-in self-test
 [source,bash]
 ----
 git pull
-just build-release
+just build
 just install --prefix=/usr/local
 ----
 
