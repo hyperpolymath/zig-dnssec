@@ -67,7 +67,7 @@ let base    = import "../_base.ncl" in
       signed_by = {
         user = "Jonathan D.A. Jewell",
         date = "2026-04-18",
-        context = "adjust trident — canonical template in zig-dnssec. (Yard, advisory) authority pattern. Specialises in cumulative-drift catchment — tolerance bands + trend tracking + auto-fix-where-declared. Advisory (continue-with-warnings). Copy this trident into a new repo and define its drift tolerances and corrective actions.",
+        context = "adjust trident — canonical template in rsr-template-repo. (Yard, advisory) authority pattern. Specialises in cumulative-drift catchment — tolerance bands + trend tracking + auto-fix-where-declared. Advisory (continue-with-warnings). Copy this trident into a new repo and define its drift tolerances and corrective actions.",
       },
       history = [
         { date = "2026-04-18", event = "trident-born", note = "Adjustfile.a2ml and adjust.ncl pre-existed. This manifest + adjust.k9.ncl complete the trident. Exercises the Yard tier + advisory authority for the first time; on_exceeded = 'warn_and_attempt_fix rather than 'fail. adjust-specific track_drift_trend_over_sessions + flag_accelerating_drift." },

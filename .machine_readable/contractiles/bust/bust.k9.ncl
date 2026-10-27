@@ -69,7 +69,7 @@ let base    = import "../_base.ncl" in
       signed_by = {
         user = "Jonathan D.A. Jewell",
         date = "2026-04-18",
-        context = "bust trident — canonical template in zig-dnssec. Completes the blocking-authority triple (must + trust + bust). Specialises in deprecated-path-reintroduction catchment. Declares hard-stop / expiry / must-not-run conditions. Copy this trident into a new repo and declare its real breakage / expiry conditions.",
+        context = "bust trident — canonical template in rsr-template-repo. Completes the blocking-authority triple (must + trust + bust). Specialises in deprecated-path-reintroduction catchment. Declares hard-stop / expiry / must-not-run conditions. Copy this trident into a new repo and declare its real breakage / expiry conditions.",
       },
       history = [
         { date = "2026-04-18", event = "trident-born", note = "Bustfile.a2ml and bust.ncl pre-existed. This manifest + bust.k9.ncl complete the trident. Inherits the full negotiation+accountability schema from intend.k9.ncl v2.0.0 + trust/must extensions; adds flag_deprecated_reintroduction for C2-defense specificity." },
@@ -88,7 +88,7 @@ let base    = import "../_base.ncl" in
   # -------------------------------------------------------------------
   declaration = {
     preamble = "# SPDX-License-Identifier: MPL-2.0\n# Bustfile — failure mode contractile for zig-dnssec\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# Paired runner: bust.ncl\n# Verb:          bust\n# Semantics:     Every declared failure mode must have a working recovery path\n#                that has been exercised. Status moves:\n#                  declared → drilled (probe run) → verified (recovery confirmed)\n#                  or → failing (recovery broken)\n#\n# CLI:\n#   contractile bust check  → list failure modes + recovery status\n#   contractile bust drill  → inject failures, verify recovery paths\n#\n# This repository: zig-dnssec is the canonical template for RSR compliance.\n# Failure modes here relate to template distribution and substitution.\n",
-    abstract = "Bustfile for zig-dnssec. Lists failure modes specific to the template\nrepository itself, particularly around template distribution, substitution,\nand synchronization across the hyperpolymath estate.",
+    abstract = "Bustfile for zig-dnssec. The failure modes below were inherited from\nrsr-template-repo at mint (template distribution, substitution and estate\nsynchronisation) and are pending owner review; this repository's own failure\nmodes are not yet declared.",
     prose = [
     ],
     failure_modes = [

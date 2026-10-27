@@ -100,7 +100,7 @@ let base    = import "../_base.ncl" in
       signed_by = {
         user = "Jonathan D.A. Jewell",
         date = "2026-04-18",
-        context = "trust trident — canonical template in zig-dnssec. (Hunt, blocking) authority pattern. Primary catchment for adversarial drift test scenarios (firewall-off, cleartext-auth, PQ-downgrade, CSP-weaken). Hard gate: failed verification blocks merge. Copy this trident into a new repo and point it at the real keys, policies, and authority boundaries.",
+        context = "trust trident — canonical template in rsr-template-repo. (Hunt, blocking) authority pattern. Primary catchment for adversarial drift test scenarios (firewall-off, cleartext-auth, PQ-downgrade, CSP-weaken). Hard gate: failed verification blocks merge. Copy this trident into a new repo and point it at the real keys, policies, and authority boundaries.",
       },
       history = [
         { date = "2026-04-18", event = "trident-born", note = "Trustfile.a2ml and trust.ncl pre-existed. This manifest + trust.k9.ncl complete the trident. Inherits on_open negotiation + accountability + plain-language-translation schema from intend.k9.ncl v2.0.0; adds trust-specific threat_model_foregrounding + block_session_close_on_critical_drift + stricter accountability pledge (user cannot disable verification to unblock merges)." },

@@ -78,7 +78,7 @@ let base    = import "../_base.ncl" in
       signed_by = {
         user = "Jonathan D.A. Jewell",
         date = "2026-04-18",
-        context = "dust trident — canonical template in zig-dnssec. Specialises in audit-trail preservation + rollback-path verification. Yard tier with destructive-action gating (dry-run default; --apply + per-item approval required for mutations). Copy this trident into a new repo and describe how it actually rolls back or retires behaviour.",
+        context = "dust trident — canonical template in rsr-template-repo. Specialises in audit-trail preservation + rollback-path verification. Yard tier with destructive-action gating (dry-run default; --apply + per-item approval required for mutations). Copy this trident into a new repo and describe how it actually rolls back or retires behaviour.",
       },
       history = [
         { date = "2026-04-18", event = "trident-born", note = "Dustfile.a2ml and dust.ncl pre-existed. This manifest + dust.k9.ncl complete the trident and the full verb set. All 6 verbs now on trident shape: intend (Hunt, reporting), trust (Hunt, blocking), must (Hunt-read-only, blocking), bust (Hunt-read-only, blocking), adjust (Yard, advisory), dust (Yard, advisory)." },
@@ -98,7 +98,7 @@ let base    = import "../_base.ncl" in
   # -------------------------------------------------------------------
   declaration = {
     preamble = "# SPDX-License-Identifier: MPL-2.0\n# Dustfile — Cleanup and hygiene contract for zig-dnssec\n# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>\n#\n# Paired runner: dust.ncl\n# Verb:          dust\n# Semantics:     What should be cleaned up. Housekeeping, not blockers.\n#\n# This repository: zig-dnssec is the canonical template.\n# Cleanup items here ensure the template itself remains pristine.\n",
-    abstract = "Cleanup and hygiene items for zig-dnssec. These are maintenance tasks\nthat ensure the template repository remains clean and ready for distribution\nto new repositories.",
+    abstract = "Cleanup and hygiene items for zig-dnssec. The items below were\ninherited from rsr-template-repo at mint and are pending owner review.",
     prose = [
     ],
     removal_candidates = [

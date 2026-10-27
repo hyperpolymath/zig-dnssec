@@ -10,7 +10,7 @@ band = "green"
 proposed-action = "none — the descriptile self-model coapts with the contractile set-point within tolerance."
 
 [coverage]
-clauses-total = 52
+clauses-total = 45
 descriptile-witnessed = 2
 probe-deferred-to-hunt = 26
 must-trust-unmeasured-gaps = 0
@@ -31,8 +31,8 @@ posture-ok = true
 
 [reading.intend]
 grade = "tropical (min-plus distance-to-north-star; wishes excluded)"
-committed-intents = 3
-distance = 2
+committed-intents = 0
+distance = 0
 within-tolerance = true
 
 [reading.bust]
@@ -44,13 +44,6 @@ grade = "expected (planned exnovation)"
 items = 7
 
 [clauses]
-intend.repo-initialization = "intent:done"
-intend.contractile-completeness = "intent:in_progress"
-intend.automation-scripts = "intent:in_progress"
-intend.cross-repo-validation = "wish:declared"
-intend.automated-substitution = "wish:declared"
-intend.formal-verification = "wish:declared"
-intend.ecosystem-visualization = "wish:declared"
 must.license-present = "probe-deferred"
 must.readme-present = "probe-deferred"
 must.security-policy = "probe-deferred"
@@ -98,5 +91,5 @@ bust.sync-drift-between-repos = "latent"
 bust.contractile-parse-error = "latent"
 
 [provenance]
-contractiles = "intend@549edc75e0fe must@50acfb3d34ab trust@5b90bd2f5a21 adjust@6af6ed5f32c3 dust@dbb110cd0e9c bust@a538d9e48a46"
+contractiles = "intend@219a3408c7dc must@f272c8d417e5 trust@a9afe7caf6f3 adjust@ad30471e03ef dust@eed13d797a25 bust@d7c2b84aae6f"
 descriptiles = "deed@b75ebbc195fa anchor@4a142af01194"
