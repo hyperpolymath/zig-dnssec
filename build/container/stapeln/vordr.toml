@@ -12,7 +12,7 @@
 #   vordr report
 
 [metadata]
-name = "y"
+name = "zig-dnssec"
 version = "0.1.0"
 
 # ============================================================================
@@ -96,7 +96,7 @@ format = "json"
 level = "info"
 # Write vordr logs to stdout (captured by Podman) and optionally to file.
 output = "stdout"
-# file = "/var/log/vordr/y.log"
+# file = "/var/log/vordr/zig-dnssec.log"
 
 # ============================================================================
 # Notifications (optional)
@@ -112,6 +112,6 @@ output = "stdout"
 
 # [notifications.email]
 # to = "j.d.a.jewell@open.ac.uk"
-# from = "vordr@y.local"
+# from = "vordr@zig-dnssec.local"
 # smtp = "smtp://localhost:25"
 # on = ["failure", "resource_critical"]

@@ -16,7 +16,7 @@
 #   # or, in the stack, via compose (see compose.toml / compose.yaml)
 
 [metadata]
-name = "y-gate"
+name = "zig-dnssec-gate"
 version = "0.1.0"
 
 # ============================================================================
@@ -27,7 +27,7 @@ version = "0.1.0"
 # Address rokur listens on (inside the container).
 listen = "[::]:8081"
 # The upstream application rokur fronts once the gate is satisfied.
-backend = "http://y:8080"
+backend = "http://zig-dnssec:8080"
 # Health/readiness endpoints rokur exposes for vordr / orchestrators.
 health_path = "/health"
 ready_path = "/ready"

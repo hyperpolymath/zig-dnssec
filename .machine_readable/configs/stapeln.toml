@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: MPL-2.0
-# stapeln.toml — Layer-based container build for y
+# stapeln.toml — Layer-based container build for zig-dnssec
 #
 # stapeln builds containers as composable layers (German: "to stack").
 # Each layer is independently cacheable, verifiable, and signable.
 
 [metadata]
-name = "y"
+name = "zig-dnssec"
 version = "0.1.0"
-description = "y container service"
+description = "zig-dnssec container service"
 author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
 license = "MPL-2.0"
 registry = "ghcr.io/hyperpolymath"
@@ -32,7 +32,7 @@ packages = []
 cache = true
 
 [layers.build]
-description = "y build"
+description = "zig-dnssec build"
 extends = "toolchain"
 commands = []
 
@@ -43,7 +43,7 @@ packages = ["ca-certificates", "curl"]
 copy-from = [
     { layer = "build", src = "/app/", dst = "/app/" },
 ]
-entrypoint = ["/app/y"]
+entrypoint = ["/app/zig-dnssec"]
 user = "nonroot"
 
 # ── Security ───────────────────────────────────────────────────

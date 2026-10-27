@@ -15,7 +15,7 @@ set -e
 # when Podman sends stop signals (e.g. `podman stop`, `selur-compose down`).
 
 cleanup() {
-    echo "Received shutdown signal — stopping y..."
+    echo "Received shutdown signal — stopping zig-dnssec..."
     # If the main process is backgrounded, kill it here:
     # kill "$MAIN_PID" 2>/dev/null || true
     # wait "$MAIN_PID" 2>/dev/null || true
@@ -27,7 +27,7 @@ trap cleanup TERM INT
 # Startup logging
 # ---------------------------------------------------------------------------
 
-echo "Starting y..."
+echo "Starting zig-dnssec..."
 echo "  Host: ${APP_HOST:-[::]}"
 echo "  Port: ${APP_PORT:-8080}"
 echo "  Data: ${APP_DATA_DIR:-/data}"
@@ -56,8 +56,8 @@ fi
 #
 # TODO: Replace the command below with your application binary.
 # Examples:
-#   exec /app/y
-#   exec /app/release/bin/y start
-#   exec /app/y serve --host "${APP_HOST}" --port "${APP_PORT}"
+#   exec /app/zig-dnssec
+#   exec /app/release/bin/zig-dnssec start
+#   exec /app/zig-dnssec serve --host "${APP_HOST}" --port "${APP_PORT}"
 
 exec "$@"

@@ -138,7 +138,7 @@ The sovereign tier wires together the stapeln container stack:
   (Kennel / Yard / Hunt).
 
 The request path in the full stack is:
-`svalinn` (edge) → `rokur` (secrets gate) → `y` (app).
+`svalinn` (edge) → `rokur` (secrets gate) → `zig-dnssec` (app).
 
 == Initialise
 

@@ -26,6 +26,7 @@ SPDX-License-Identifier: MPL-2.0
 -->
 # Policy
 Prose mentions TEMPLATE INSTRUCTIONS and must survive.
+<!-- TEMPLATE INSTRUCTIONS: delete only this comment -->
 Actual policy.
 DOC
 bash "$repo/scripts/rust-tool.sh" strip-instruction-blocks "$fixture"

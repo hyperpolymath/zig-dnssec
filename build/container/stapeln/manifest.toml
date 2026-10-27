@@ -6,7 +6,7 @@
 # container packaging. Used by `ct pack` to create .ctp bundles.
 
 [metadata]
-name = "y"
+name = "zig-dnssec"
 version = "0.1.0"
 revision = 1
 summary = "Experimental pure-Zig DNS wire-format codec, DNSSEC validator and DoH stub client."
@@ -35,7 +35,7 @@ APP_HOST = "[::]"
 APP_PORT = "8080"
 
 [outputs]
-primary = "y"
+primary = "zig-dnssec"
 split = []
 
 [attestations]

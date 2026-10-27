@@ -10,5 +10,5 @@
 Contact: mailto:j.d.a.jewell@open.ac.uk
 Expires: 2026-12-31T23:59:59.000Z
 Preferred-Languages: en
-Canonical: https://github.com/hyperpolymath/zig-dnssec/.well-known/security.txt
+Canonical: https://raw.githubusercontent.com/hyperpolymath/zig-dnssec/main/www/.well-known/security.txt
 Policy: https://github.com/hyperpolymath/zig-dnssec/blob/main/.github/SECURITY.md

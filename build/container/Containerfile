@@ -11,13 +11,13 @@
 # svalinn files under build/container/stapeln/ are referenced only as labels.
 #
 # Build (engine-agnostic — substitute podman | nerdctl | docker):
-#   podman build -t y:latest -f build/container/Containerfile .
+#   podman build -t zig-dnssec:latest -f build/container/Containerfile .
 #
 # Run:
-#   podman run -p 8080:8080 y:latest
+#   podman run -p 8080:8080 zig-dnssec:latest
 #
 # Run with persistent volume:
-#   podman run -p 8080:8080 -v y-data:/data y:latest
+#   podman run -p 8080:8080 -v zig-dnssec-data:/data zig-dnssec:latest
 #
 # Via the Justfile (auto-detects engine, prefers cerro-torre when present):
 #   just container-build
@@ -37,7 +37,7 @@
 #   COPY Cargo.toml Cargo.lock ./
 #   COPY src/ ./src/
 #   RUN cargo build --release
-#   # Output: /build/target/release/y
+#   # Output: /build/target/release/zig-dnssec
 #
 # --- Elixir ---
 #   RUN apk add --no-cache erl27-elixir-1.18 erlang-27 erlang-27-dev git build-base
@@ -47,14 +47,14 @@
 #   ENV MIX_ENV=prod
 #   RUN mix local.hex --force && mix local.rebar --force && \
 #       mix deps.get --only prod && mix compile && mix release
-#   # Output: /build/_build/prod/rel/y/
+#   # Output: /build/_build/prod/rel/zig-dnssec/
 #
 # --- Zig ---
 #   RUN apk add --no-cache zig build-base
 #   COPY build.zig build.zig.zon ./
 #   COPY src/ ./src/
 #   RUN zig build -Doptimize=ReleaseFast
-#   # Output: /build/zig-out/bin/y
+#   # Output: /build/zig-out/bin/zig-dnssec
 #
 # Base image: `:latest` is right for a template scaffold (Chainguard rebuilds
 # Wolfi daily). For PRODUCTION builds, pin by digest for reproducibility/supply-
@@ -109,9 +109,9 @@ WORKDIR /app
 
 # TODO: Copy compiled binary/release from builder stage.
 # Examples:
-#   COPY --from=builder /build/target/release/y /app/y
-#   COPY --from=builder /build/_build/prod/rel/y /app/release/
-#   COPY --from=builder /build/zig-out/bin/y /app/y
+#   COPY --from=builder /build/target/release/zig-dnssec /app/zig-dnssec
+#   COPY --from=builder /build/_build/prod/rel/zig-dnssec /app/release/
+#   COPY --from=builder /build/zig-out/bin/zig-dnssec /app/zig-dnssec
 
 # Copy entrypoint script
 COPY build/container/entrypoint.sh /app/entrypoint.sh

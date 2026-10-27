@@ -65,9 +65,9 @@ rate_limits:
 trust:
   # Only accept .ctp bundles signed by these keys.
   trusted_signers:
-    - key_id: "y-release"
+    - key_id: "zig-dnssec-release"
       algorithm: "Ed25519"
-      public_key_file: "/etc/svalinn/keys/y-release.pub"
+      public_key_file: "/etc/svalinn/keys/zig-dnssec-release.pub"
 
   # Require these attestations on all .ctp bundles.
   required_attestations:

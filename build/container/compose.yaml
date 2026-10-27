@@ -20,11 +20,11 @@ services:
   # ──────────────────────────────────────────────────────────────────────
   # Primary application service
   # ──────────────────────────────────────────────────────────────────────
-  "y":
+  "zig-dnssec":
     build:
       context: ..
       dockerfile: build/container/Containerfile
-    image: "ghcr.io/hyperpolymath/y:latest"
+    image: "ghcr.io/hyperpolymath/zig-dnssec:latest"
     ports:
       - "8080:8080"
     environment:
@@ -33,7 +33,7 @@ services:
       APP_LOG_FORMAT: "json"
       APP_DATA_DIR: "/data"
     volumes:
-      - "y-data:/data"
+      - "zig-dnssec-data:/data"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
@@ -50,7 +50,7 @@ services:
   rokur:
     image: ghcr.io/hyperpolymath/rokur:latest
     environment:
-      ROKUR_BACKEND: "http://y:8080"
+      ROKUR_BACKEND: "http://zig-dnssec:8080"
       ROKUR_LISTEN: "[::]:8081"
       ROKUR_REQUIRED_SECRETS: ""        # comma-separated env names that MUST be set
       ROKUR_AUDIT_LOG: "/var/log/rokur/audit.jsonl"
@@ -60,7 +60,7 @@ services:
     volumes:
       - rokur-audit:/var/log/rokur
     depends_on:
-      "y":
+      "zig-dnssec":
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -95,5 +95,5 @@ services:
       retries: 3
 
 volumes:
-  "y-data":
+  "zig-dnssec-data":
   rokur-audit:

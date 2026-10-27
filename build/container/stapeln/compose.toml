@@ -10,7 +10,7 @@
 #   selur-compose up --detach            # Start in background
 #   selur-compose verify                 # Verify all .ctp signatures
 #   selur-compose ps                     # Check status
-#   selur-compose logs -f y  # Stream logs
+#   selur-compose logs -f zig-dnssec  # Stream logs
 #   selur-compose down                   # Stop all services
 #
 # Fallback (when selur is not installed): this TOML is selur-native and is
@@ -25,8 +25,8 @@ version = "1.0"
 # ============================================================================
 
 # Primary application service
-[services.y]
-image = "ghcr.io/hyperpolymath/y:latest.ctp"
+[services.zig-dnssec]
+image = "ghcr.io/hyperpolymath/zig-dnssec:latest.ctp"
 ports = ["8080:8080"]
 environment = {
   APP_HOST = "[::]",
@@ -34,7 +34,7 @@ environment = {
   APP_LOG_FORMAT = "json",
   APP_DATA_DIR = "/data",
 }
-volumes = ["y-data:/data"]
+volumes = ["zig-dnssec-data:/data"]
 restart = "always"
 healthcheck = { test = "curl -sf http://localhost:8080/health", interval = "30s", timeout = "5s", retries = 3 }
 
@@ -45,14 +45,14 @@ healthcheck = { test = "curl -sf http://localhost:8080/health", interval = "30s"
 image = "ghcr.io/hyperpolymath/rokur:latest.ctp"
 ports = ["8081:8081"]
 environment = {
-  ROKUR_BACKEND = "http://y:8080",
+  ROKUR_BACKEND = "http://zig-dnssec:8080",
   ROKUR_LISTEN = "[::]:8081",
   ROKUR_REQUIRED_SECRETS = "",
   ROKUR_AUDIT_LOG = "/var/log/rokur/audit.jsonl",
   ROKUR_LOG_FORMAT = "json",
 }
 volumes = ["rokur-audit:/var/log/rokur"]
-depends_on = ["y"]
+depends_on = ["zig-dnssec"]
 restart = "always"
 healthcheck = { test = "curl -sf http://localhost:8081/health", interval = "30s", timeout = "5s", retries = 3 }
 
@@ -75,7 +75,7 @@ healthcheck = { test = "curl -sf http://localhost:80/health", interval = "30s", 
 # Volumes
 # ============================================================================
 
-[volumes.y-data]
+[volumes.zig-dnssec-data]
 driver = "local"
 
 [volumes.rokur-audit]
