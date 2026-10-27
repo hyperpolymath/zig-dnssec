@@ -197,6 +197,54 @@ Every item here is a known limitation, not a hidden one.
   Labels field is 3, but the owner `example.com.` has two labels, which RFC 4035 §5.3.1
   requires a validator to reject. `tests/vectors.zig` checks both facts.
 
+== What the milestone-1 review found
+
+The milestone-1 pull request was reviewed twice by an automated reviewer over
+the wire codec, the validator, the DoH transport and the container build. All
+twelve findings are fixed, and each has a regression test that was confirmed
+to fail against the code it now guards (`zig build test`: 123 tests). They are
+recorded here because two of them are the shape of bug this threat model
+exists to rule out, and the model did not rule it out.
+
+* *Insecurity inferred from an unauthenticated name.* The validator decided
+  that a zone was insecure from the `Signer` field of an RRSIG it had not
+  verified — on the answer path and, separately, on the denial path, where it
+  returned `insecure` before checking a single signature over the NSEC/NSEC3
+  and SOA records that were supposed to prove it. `Signer` is attacker-chosen:
+  it is only meaningful once a signature over it verifies. Combined with the
+  absence of a closest-anchor check, this let a responder inside a configured
+  secure island hand back a tampered answer as usable `insecure` data, which
+  is precisely the silent downgrade that the no-silent-downgrade rule above forbids. Both paths now
+  authenticate first, gather every candidate signer deepest-first, and refuse
+  a signer that is at or above a configured anchor.
+* *Unsigned fields treated as evidence.* Three findings were the same error in
+  different fields: the minimum `Labels` over all RRSIGs present rather than
+  the one that verified (a forged sibling could move the wildcard proof
+  depth); the first DS signature's signer rather than any that authenticates
+  (an extra RRSIG could break a valid chain); and the received TTL of unsigned
+  data as the answer's cache lifetime, which let an `insecure` answer outlive
+  the denial proof that made it acceptable. `TTL` and `Labels` are not covered
+  by an RRSIG over the data; only the RRSIG's own `Original TTL` and `Labels`
+  are, and only once that signature verifies.
+
+The remaining findings were correctness and robustness rather than
+downgrades: `QTYPE=RRSIG` misreported as `bogus`, `QTYPE=CNAME` below a DNAME
+redirected past the synthesised answer (RFC 6672 §5.3.1), `effectiveTtl`
+wrapping for skew-accepted signatures, a missing SVCB/HTTPS RDATA layout so
+the TargetName was hashed in its received case, a `u8` overflow when a
+relative name is joined to its `$ORIGIN`, a dropped query component in a DoH
+URI template (RFC 8484 §3.1), and a container `CMD` whose `;`-chained teardown
+masked the cross-check's exit status.
+
+Two limits on this evidence are worth stating. The tests use the recorded
+cross-check fixtures, so they cover the zones and responses in
+`tests/testdata/crosscheck.traces` and synthetic mutations of them; they are
+not a substitute for the independent review recommended below. And the
+negative controls were run by reverting `src/dnssec/validator.zig` and
+`src/dnssec/rrset.zig` to their pre-fix state: seven replay tests failed as
+predicted and the positive control still passed, which is the only reason to
+believe the new tests test anything.
+
 == Review recommendation
 
 Before anyone relies on this validator it should be reviewed independently, with

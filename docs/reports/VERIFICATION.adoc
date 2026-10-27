@@ -194,6 +194,52 @@ queries), run by `tests/crosscheck/run.sh`:
 
 include::FUZZ-RESULTS.adoc[]
 
+== The milestone-1 review cycle
+
+Milestone 1 was reviewed externally before merge (`hyperpolymath/zig-dnssec`#4,
+two automated review passes). Twelve findings were raised against
+`src/dnssec/validator.zig`, `src/dnssec/rrset.zig`, `src/wire/name.zig`,
+`src/wire/rdata.zig`, `src/stub/doh.zig` and `build/container/Containerfile`.
+All twelve are fixed; the two that mattered most are described in
+`docs/architecture/THREAT-MODEL.adoc` §"What the milestone-1 review found".
+
+The test count went from 111 to 123. The twelve additions are:
+
+* four unit tests in the sources they guard (`wire/name.zig` relative-name
+  length overflow, `wire/rdata.zig` SVCB/HTTPS canonical form,
+  `dnssec/rrset.zig` skew-bounded `effectiveTtl`, `stub/doh.zig` query
+  component in the request target);
+* seven replay tests in `tests/replay.zig`, built from the recorded
+  cross-check fixtures by rewriting only fields an RRSIG does not cover — the
+  question section, the received TTLs, and the presence and content of
+  additional RRSIGs — plus one positive control that an anchored island below
+  an insecure delegation validates as `secure`;
+* one C ABI case in `src/interface/ffi/test/abi_test.zig` (`QTYPE=RRSIG` is
+  refused with `ZIG_DNSSEC_ERR_INVALID_ARGUMENT`).
+
+*Negative controls.* A regression test that passes on both the broken and the
+fixed code proves nothing. Reverting `src/dnssec/validator.zig` and
+`src/dnssec/rrset.zig` to their pre-fix state makes seven of the seven new
+replay tests fail, each with the symptom its finding describes: a tampered
+answer accepted as `insecure` under an island anchor; a forged NXDOMAIN
+accepted as `insecure_delegation`; a valid chain broken by one extraneous DS
+RRSIG; a valid wildcard answer rejected because of a forged `Labels` field; an
+`insecure` answer cached for the attacker-chosen 86400 s; `QTYPE=CNAME` below
+a DNAME returning `indeterminate`; and `QTYPE=RRSIG` returning `indeterminate`
+rather than being refused. The positive control passed in both states, as it
+should. The `wire/name.zig` test aborts the pre-fix build outright — the
+overflow is a checked-arithmetic panic in Debug and ReleaseSafe, and an
+out-of-bounds copy in an unchecked mode.
+
+Two things this evidence does *not* establish. The fixtures are the 22 zones
+of `tests/crosscheck/`, so a finding that needs a signed zone strictly below
+an unsigned delegation cannot be built from them without new key material; the
+island tests place the trust anchor below the insecure delegation instead,
+which exercises the same code path with different key provenance. And no new
+signed zone was generated for this cycle (`ldns-signzone` and `kskgen` were not
+available), so every fixture is a recorded or minimally rewritten Unbound
+response.
+
 == Findings outside this code
 
 * *Zig 0.17.0 `std.http.Client` + CONNECT proxy sends HTTPS requests in cleartext*
