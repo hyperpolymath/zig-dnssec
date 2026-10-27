@@ -64,8 +64,10 @@ pub const Reason = enum {
     dnskey_not_authenticated,
     /// The DS RRset failed to verify with the parent's keys.
     ds_not_authenticated,
-    /// RRSIG signer is not an ancestor of the owner, or a DS/denial signer
-    /// is not a proper ancestor where it must be.
+    /// RRSIG signer is not an ancestor of the owner, a DS/denial signer is
+    /// not a proper ancestor where it must be, or the signer names a zone
+    /// above the closest applicable trust anchor (whose insecurity therefore
+    /// says nothing about the owner).
     bad_signer,
     /// Authenticated NSEC/NSEC3 do not prove what the response claims.
     denial_failed,
@@ -226,33 +228,53 @@ pub const Validator = struct {
 
 const KeyStatus = union(enum) {
     secure: *const RrSet,
-    insecure: struct { reason: Reason, zone: Name },
+    insecure: Insecurity,
     bogus: Failure,
     indeterminate: Failure,
 };
 
 const NameStatus = union(enum) {
     /// Unsigned data here is legitimately unsigned.
-    insecure: struct { reason: Reason, zone: Name },
+    insecure: Insecurity,
     /// The name lies in this zone, which is provably signed.
     signed_zone: Name,
     bogus: Failure,
     indeterminate: Failure,
 };
 
+/// An accepted statement that unsigned data is legitimately unsigned, and how
+/// long that statement is good for.
+///
+/// `ttl` is the lifetime of the *proof* — the minimum effective TTL of the
+/// authenticated NSEC/NSEC3 or DS records that established it. It has to bound
+/// the answer's cache lifetime as well: the TTL of the unsigned data itself is
+/// chosen by whoever answered, so an on-path responder could otherwise attach
+/// a huge TTL to a forged answer and keep it cached long after the proof
+/// expired or the delegation was signed. `maxInt(u32)` means the proof has no
+/// expiry of its own (a statically configured trust anchor).
+const Insecurity = struct {
+    reason: Reason,
+    /// Zone (or delegation point) at which insecurity was established.
+    zone: Name,
+    ttl: u32 = std.math.maxInt(u32),
+};
+
 /// Combined status while assembling an answer.
 const Acc = struct {
-    insecure: ?struct { reason: Reason, zone: Name } = null,
+    insecure: ?Insecurity = null,
     ttl: u32 = std.math.maxInt(u32),
 
-    fn markInsecure(acc: *Acc, reason: Reason, zone: Name) void {
-        if (acc.insecure == null) acc.insecure = .{ .reason = reason, .zone = zone };
+    /// Records the first insecurity proven for this answer and bounds the
+    /// answer's lifetime by the proof that allowed it.
+    fn markInsecure(acc: *Acc, i: Insecurity) void {
+        acc.ttl = @min(acc.ttl, i.ttl);
+        if (acc.insecure == null) acc.insecure = i;
     }
 };
 
 const SetOutcome = union(enum) {
     secure: struct { signer: Name, labels: u8, ttl: u32 },
-    insecure: struct { reason: Reason, zone: Name },
+    insecure: Insecurity,
     bogus: Failure,
     indeterminate: Failure,
 };
@@ -315,10 +337,24 @@ const Session = struct {
 
     // ----- signature checking ---------------------------------------------
 
-    const KeyCheck = union(enum) { ok: u32, err: Failure };
+    const Verified = struct {
+        /// TTL to report for the RRset (RFC 4035 §5.3.3).
+        ttl: u32,
+        /// The Labels value of the RRSIG that actually verified.
+        labels: u8,
+    };
+
+    const KeyCheck = union(enum) { ok: Verified, err: Failure };
 
     /// Verifies `set` with any key in `keyset` (all of which share the zone
     /// name `keyset.name`). Bounded by the per-RRset failure budget.
+    ///
+    /// The TTL and Labels returned are those of the *one signature that
+    /// verified*. Deriving Labels from the RRset's signatures as a group would
+    /// let an attacker append a forged same-signer RRSIG carrying a smaller
+    /// Labels field and have an ordinary answer treated as a wildcard
+    /// expansion, which then demands a denial proof the real response does not
+    /// carry.
     fn verifyWithKeys(s: *Session, set: *const RrSet, keyset: *const RrSet) Allocator.Error!KeyCheck {
         var failures: u32 = 0;
         var last: ?Failure = null;
@@ -337,7 +373,10 @@ const Session = struct {
                 }
                 s.stats.verifications += 1;
                 if (rrset_mod.verify(s.a, set, sig, &keyset.name, kr, s.now, s.v.policy.clock_skew)) |_| {
-                    return .{ .ok = rrset_mod.effectiveTtl(set, sig, s.now) };
+                    return .{ .ok = .{
+                        .ttl = rrset_mod.effectiveTtl(set, sig, s.now, s.v.policy.clock_skew),
+                        .labels = sig.rrsig.labels,
+                    } };
                 } else |e| {
                     if (e == error.OutOfMemory) return error.OutOfMemory;
                     failures += 1;
@@ -350,52 +389,57 @@ const Session = struct {
         return .{ .err = fail(.no_matching_key, set.name, set.type, null) };
     }
 
+    /// True when `signer` lies strictly above the closest trust anchor that
+    /// applies to `owner`.
+    ///
+    /// RFC 4035 §5.2 makes the *closest* anchor authoritative, so a secure
+    /// island configured below an insecure delegation is still secure. An
+    /// RRSIG naming such an ancestor proves nothing about `owner`: everything
+    /// below the insecure delegation is unsigned, so an on-path responder can
+    /// attach one to any RRset it likes. Honouring that signer's insecurity
+    /// would hand back a tampered answer from inside the island as merely
+    /// `insecure` (usable) instead of `bogus`.
+    fn signerAboveAnchor(s: *const Session, signer: *const Name, owner: *const Name) bool {
+        const a = s.v.anchors.closest(owner) orelse return false;
+        return a.name.isStrictSubdomainOf(signer);
+    }
+
     /// Authenticates one RRset from a response.
     fn validateSet(s: *Session, set: *const RrSet) Allocator.Error!SetOutcome {
         if (!set.isSigned()) {
             return switch (try s.nameStatus(set.name)) {
-                .insecure => |i| .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
+                .insecure => |i| .{ .insecure = i },
                 .signed_zone => .{ .bogus = fail(.missing_signature, set.name, set.type, null) },
                 .bogus => |f| .{ .bogus = f },
                 .indeterminate => |f| .{ .indeterminate = f },
             };
         }
-        // Try each distinct signer named by the RRSIGs.
+        // Try each distinct signer named by the RRSIGs, deepest first.
         var first_failure: ?SetOutcome = null;
-        for (set.sigs, 0..) |*sig, si| {
-            const signer = sig.rrsig.signer;
-            var dup = false;
-            for (set.sigs[0..si]) |*prev| if (prev.rrsig.signer.eql(&signer)) {
-                dup = true;
-            };
-            if (dup) continue;
+        for (try signerCandidates(s.a, set.sigs)) |signer| {
             if (!set.name.isSubdomainOf(&signer)) {
                 if (first_failure == null) first_failure = .{ .bogus = fail(.bad_signer, set.name, set.type, null) };
                 continue;
             }
             const out: SetOutcome = switch (try s.zoneStatus(signer)) {
                 .secure => |ks| switch (try s.verifyWithKeys(set, ks)) {
-                    .ok => |ttl| .{ .secure = .{ .signer = signer, .labels = labelsUsed(set, signer), .ttl = ttl } },
+                    .ok => |v| .{ .secure = .{ .signer = signer, .labels = v.labels, .ttl = v.ttl } },
                     .err => |f| .{ .bogus = f },
                 },
-                .insecure => |i| .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
+                .insecure => |i| if (s.signerAboveAnchor(&signer, &set.name))
+                    // A closer anchor governs this owner; the ancestor's
+                    // insecurity is not a proof about it. Keep looking for a
+                    // signature by a zone at or below that anchor.
+                    .{ .bogus = fail(.bad_signer, set.name, set.type, null) }
+                else
+                    .{ .insecure = i },
                 .bogus => |f| .{ .bogus = f },
                 .indeterminate => |f| .{ .indeterminate = f },
             };
             if (out == .secure or out == .insecure) return out;
             if (first_failure == null) first_failure = out;
         }
-        return first_failure.?;
-    }
-
-    /// Smallest RRSIG Labels value among the set's signatures by `signer`
-    /// (a value below the owner's label count means wildcard expansion).
-    fn labelsUsed(set: *const RrSet, signer: Name) u8 {
-        var l: u8 = set.name.rrsigLabelCount();
-        for (set.sigs) |*sig| {
-            if (sig.rrsig.signer.eql(&signer)) l = @min(l, sig.rrsig.labels);
-        }
-        return l;
+        return first_failure orelse .{ .bogus = fail(.no_supported_signature, set.name, set.type, null) };
     }
 
     // ----- zone keys --------------------------------------------------------
@@ -429,24 +473,38 @@ const Session = struct {
                 // Unsigned DS: acceptable only if the parent side is insecure.
                 const parent = zone.parent() orelse return .{ .bogus = fail(.missing_signature, zone, .ds, null) };
                 return switch (try s.nameStatus(parent)) {
-                    .insecure => |i| .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
+                    .insecure => |i| .{ .insecure = i },
                     .signed_zone => .{ .bogus = fail(.missing_signature, zone, .ds, null) },
                     .bogus => |f| .{ .bogus = f },
                     .indeterminate => |f| .{ .indeterminate = f },
                 };
             }
-            const p = ds_set.sigs[0].rrsig.signer;
-            if (!zone.isStrictSubdomainOf(&p)) return .{ .bogus = fail(.bad_signer, zone, .ds, null) };
-            switch (try s.zoneStatus(p)) {
-                .secure => |pk| switch (try s.verifyWithKeys(ds_set, pk)) {
-                    .ok => {},
-                    .err => |f| return .{ .bogus = .{ .reason = if (f.reason == .resource_limit) .resource_limit else .ds_not_authenticated, .name = zone, .rtype = .ds, .detail = f.detail } },
-                },
-                .insecure => |i| return .{ .insecure = i },
-                .bogus => |f| return .{ .bogus = f },
-                .indeterminate => |f| return .{ .indeterminate = f },
+            // Try every distinct signer the DS RRset's RRSIGs name.
+            var first_failure: ?KeyStatus = null;
+            for (try signerCandidates(s.a, ds_set.sigs)) |p| {
+                if (!zone.isStrictSubdomainOf(&p)) {
+                    if (first_failure == null) first_failure = .{ .bogus = fail(.bad_signer, zone, .ds, null) };
+                    continue;
+                }
+                const st: KeyStatus = switch (try s.zoneStatus(p)) {
+                    .secure => |pk| switch (try s.verifyWithKeys(ds_set, pk)) {
+                        // The authenticated DS RRset is the proof that the
+                        // delegation is signed, so its own lifetime bounds how
+                        // long a policy-granted insecurity may be cached.
+                        .ok => |v| try s.keysFromDs(zone, ds_set.rdatas, v.ttl),
+                        .err => |f| .{ .bogus = .{ .reason = if (f.reason == .resource_limit) .resource_limit else .ds_not_authenticated, .name = zone, .rtype = .ds, .detail = f.detail } },
+                    },
+                    .insecure => |i| if (s.signerAboveAnchor(&p, &zone))
+                        .{ .bogus = fail(.bad_signer, zone, .ds, null) }
+                    else
+                        .{ .insecure = i },
+                    .bogus => |f| .{ .bogus = f },
+                    .indeterminate => |f| .{ .indeterminate = f },
+                };
+                if (st == .secure or st == .insecure) return st;
+                if (first_failure == null) first_failure = st;
             }
-            return s.keysFromDs(zone, ds_set.rdatas);
+            return first_failure orelse .{ .bogus = fail(.ds_not_authenticated, zone, .ds, null) };
         }
 
         // Negative DS response.
@@ -458,17 +516,17 @@ const Session = struct {
                 const y = soa_owner orelse (zone.parent() orelse return .{ .bogus = fail(.denial_missing, zone, .ds, null) });
                 if (!zone.isStrictSubdomainOf(&y)) return .{ .bogus = fail(.malformed_response, zone, .ds, null) };
                 return switch (try s.nameStatus(y)) {
-                    .insecure => |i| .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
+                    .insecure => |i| .{ .insecure = i },
                     .signed_zone => .{ .bogus = fail(.denial_missing, zone, .ds, null) },
                     .bogus => |f| .{ .bogus = f },
                     .indeterminate => |f| .{ .indeterminate = f },
                 };
             },
             .failed => |f| return failureToKey(f),
-            .insecure => |i| return .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
+            .insecure => |i| return .{ .insecure = i },
             .ok => |d| {
                 return switch (try s.proveInsecureDelegation(&d, zone)) {
-                    .proven => |r| .{ .insecure = .{ .reason = r, .zone = zone } },
+                    .proven => |pr| .{ .insecure = .{ .reason = pr.reason, .zone = zone, .ttl = pr.ttl } },
                     .not_proven => |f| .{ .bogus = f },
                 };
             },
@@ -508,9 +566,9 @@ const Session = struct {
         return out;
     }
 
-    fn unsupportedOutcome(s: *Session, zone: Name) KeyStatus {
+    fn unsupportedOutcome(s: *Session, zone: Name, proof_ttl: u32) KeyStatus {
         return switch (s.v.policy.unsupported_algorithm) {
-            .insecure => .{ .insecure = .{ .reason = .unsupported_algorithm_policy, .zone = zone } },
+            .insecure => .{ .insecure = .{ .reason = .unsupported_algorithm_policy, .zone = zone, .ttl = proof_ttl } },
             .fail => .{ .bogus = fail(.unsupported_algorithm, zone, .ds, null) },
         };
     }
@@ -531,9 +589,15 @@ const Session = struct {
 
     /// Authenticates the zone's DNSKEY RRset from DS records that are
     /// themselves already trusted (authenticated, or a trust anchor).
-    fn keysFromDs(s: *Session, zone: Name, ds_rdatas: []const []const u8) Allocator.Error!KeyStatus {
+    ///
+    /// `proof_ttl` is the lifetime of the trusted DS material itself: the
+    /// effective TTL of the authenticated DS RRset, or no bound at all for a
+    /// statically configured anchor. It bounds any insecurity this function
+    /// grants as a matter of policy, which is otherwise bounded only by the
+    /// TTL of unsigned data — chosen by whoever answered.
+    fn keysFromDs(s: *Session, zone: Name, ds_rdatas: []const []const u8, proof_ttl: u32) Allocator.Error!KeyStatus {
         const use = try s.usableDs(ds_rdatas);
-        if (use.usable.items.len == 0) return s.unsupportedOutcome(zone);
+        if (use.usable.items.len == 0) return s.unsupportedOutcome(zone, proof_ttl);
         const ks = switch (try s.fetchKeyset(zone)) {
             .ok => |k| k,
             .err => |st| return st,
@@ -569,8 +633,12 @@ const Session = struct {
     }
 
     fn anchoredKeys(s: *Session, zone: Name, anchor: *const anchors_mod.Anchor) Allocator.Error!KeyStatus {
+        // A trust anchor is static configuration with no expiry of its own:
+        // nothing fetched bounds its lifetime, so a policy-granted insecurity
+        // derived from it carries no proof TTL.
+        const unbounded = std.math.maxInt(u32);
         if (anchor.ds.len > 0) {
-            const st = try s.keysFromDs(zone, anchor.ds);
+            const st = try s.keysFromDs(zone, anchor.ds, unbounded);
             if (st == .secure or anchor.dnskey.len == 0) return st;
         }
         // DNSKEY anchors: the anchored key itself must sign the key set.
@@ -579,7 +647,7 @@ const Session = struct {
             const k = rdata.Dnskey.parse(ak) catch continue;
             if (crypto.isSupported(k.algorithm) and (!crypto.usesSha1(k.algorithm) or s.v.policy.allow_sha1)) supported = true;
         }
-        if (!supported) return s.unsupportedOutcome(zone);
+        if (!supported) return s.unsupportedOutcome(zone, unbounded);
         const ks = switch (try s.fetchKeyset(zone)) {
             .ok => |k| k,
             .err => |st| return st,
@@ -637,10 +705,10 @@ const Session = struct {
                     .indeterminate => |ff| .{ .indeterminate = ff },
                     else => unreachable,
                 },
-                .insecure => |i| return .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
+                .insecure => |i| return .{ .insecure = i },
                 .ok => |d| {
                     return switch (try s.proveInsecureDelegation(&d, x)) {
-                        .proven => |r| .{ .insecure = .{ .reason = r, .zone = x } },
+                        .proven => |pr| .{ .insecure = .{ .reason = pr.reason, .zone = x, .ttl = pr.ttl } },
                         // x exists inside the signed zone d.zone (or does not
                         // exist at all): unsigned data there is not acceptable.
                         .not_proven => .{ .signed_zone = d.zone },
@@ -653,7 +721,7 @@ const Session = struct {
     fn keyToName(k: KeyStatus, zone: Name) NameStatus {
         return switch (k) {
             .secure => .{ .signed_zone = zone },
-            .insecure => |i| .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
+            .insecure => |i| .{ .insecure = i },
             .bogus => |f| .{ .bogus = f },
             .indeterminate => |f| .{ .indeterminate = f },
         };
@@ -665,6 +733,9 @@ const Session = struct {
         zone: Name,
         nsec_recs: []nsec.Record,
         nsec3_recs: []nsec3.Record,
+        /// Lifetime of the authenticated proof: the minimum effective TTL of
+        /// the NSEC/NSEC3 and SOA records that were verified to establish it.
+        ttl: u32,
     };
 
     const DenialCollect = union(enum) {
@@ -672,7 +743,7 @@ const Session = struct {
         none: ?Name,
         failed: Failure,
         /// The zone that signed the denial records is itself insecure.
-        insecure: struct { reason: Reason, zone: Name },
+        insecure: Insecurity,
         ok: Denial,
     };
 
@@ -682,65 +753,119 @@ const Session = struct {
     /// parent side).
     fn collectDenial(s: *Session, auth: *const rrset_mod.Grouped, target: *const Name, strict_parent: bool) Allocator.Error!DenialCollect {
         var soa_owner: ?Name = null;
-        var zone: ?Name = null;
+        // Gather the signers from EVERY RRSIG on every signed NSEC/NSEC3 that
+        // could cover `target`, not from the first one alone. Signer choice and
+        // signer order are both under the responder's control, so taking
+        // `sigs[0]` of the first matching set let it nominate the zone: prepend
+        // an RRSIG naming an insecure ancestor and the denial was accepted on
+        // that ancestor's say-so, with no signature over the denial records
+        // themselves ever checked.
+        var sigs: std.ArrayList(rrset_mod.Sig) = .empty;
         for (auth.sets) |*set| {
             if (set.type == .soa) soa_owner = set.name;
             if (set.type != .nsec and set.type != .nsec3) continue;
             if (!set.isSigned()) continue;
-            const signer = set.sigs[0].rrsig.signer;
-            const ok_rel = if (strict_parent) target.isStrictSubdomainOf(&signer) else target.isSubdomainOf(&signer);
-            if (!ok_rel) continue;
-            if (zone == null or signer.labelCount() > zone.?.labelCount()) zone = signer;
+            for (set.sigs) |*sig| {
+                const signer = sig.rrsig.signer;
+                const ok_rel = if (strict_parent) target.isStrictSubdomainOf(&signer) else target.isSubdomainOf(&signer);
+                if (ok_rel) try sigs.append(s.a, sig.*);
+            }
         }
-        const z = zone orelse {
-            // No authenticated NSEC/NSEC3 record covers `target`. Whether the
-            // missing denial is legitimate (the zone is provably unsigned) or
-            // a downgrade (a signed zone that withheld its proof) is left to
-            // the caller, which walks the authenticated chain from the trust
-            // anchor down to the SOA *owner*.
-            //
-            // The RRSIG Signer's Name on the SOA must NOT be consulted here.
-            // It is unverified and attacker-controlled; an earlier version
-            // read it and called zoneStatus on it directly, with no signature
-            // check and no test that the signer was an ancestor of `target`.
-            // A forged response could then name any unrelated insecure zone as
-            // the signer and have a secure name's tampered or unsigned answer
-            // accepted as insecure rather than bogus. The SOA owner, by
-            // contrast, is only a hint for which zone the caller should
-            // authenticate from the anchor; a lie about it fails the caller's
-            // `isStrictSubdomainOf` / `isSubdomainOf` ancestry check.
-            return .{ .none = soa_owner };
-        };
-        const ks = switch (try s.zoneStatus(z)) {
-            .secure => |k| k,
-            .insecure => |i| return .{ .insecure = .{ .reason = i.reason, .zone = i.zone } },
-            .bogus => |f| return .{ .failed = f },
-            .indeterminate => |f| return .{ .failed = f },
-        };
+        var first_failure: ?DenialCollect = null;
+        for (try signerCandidates(s.a, sigs.items)) |z| {
+            const ks = switch (try s.zoneStatus(z)) {
+                .secure => |k| k,
+                .insecure => |i| {
+                    // An insecure zone above the closest applicable anchor for
+                    // `target` cannot vouch for it. The denial is refused here
+                    // rather than accepted as proof of insecurity, and the
+                    // remaining candidates are still tried.
+                    if (s.signerAboveAnchor(&z, target)) {
+                        if (first_failure == null) first_failure = .{ .failed = fail(.bad_signer, target.*, .nsec, null) };
+                        continue;
+                    }
+                    return .{ .insecure = i };
+                },
+                .bogus => |f| {
+                    if (first_failure == null) first_failure = .{ .failed = f };
+                    continue;
+                },
+                .indeterminate => |f| {
+                    if (first_failure == null) first_failure = .{ .failed = f };
+                    continue;
+                },
+            };
+            switch (try s.authenticateDenial(auth, target, &z, ks)) {
+                .ok => |d| return .{ .ok = d },
+                .failed => |f| {
+                    if (first_failure == null) first_failure = .{ .failed = f };
+                },
+            }
+        }
+        if (first_failure) |f| return f;
+        // No authenticated NSEC/NSEC3 record covers `target`. Whether the
+        // missing denial is legitimate (the zone is provably unsigned) or
+        // a downgrade (a signed zone that withheld its proof) is left to
+        // the caller, which walks the authenticated chain from the trust
+        // anchor down to the SOA *owner*.
+        //
+        // The RRSIG Signer's Name on the SOA must NOT be consulted here.
+        // It is unverified and attacker-controlled; an earlier version
+        // read it and called zoneStatus on it directly, with no signature
+        // check and no test that the signer was an ancestor of `target`.
+        // A forged response could then name any unrelated insecure zone as
+        // the signer and have a secure name's tampered or unsigned answer
+        // accepted as insecure rather than bogus. The SOA owner, by
+        // contrast, is only a hint for which zone the caller should
+        // authenticate from the anchor; a lie about it fails the caller's
+        // `isStrictSubdomainOf` / `isSubdomainOf` ancestry check.
+        return .{ .none = soa_owner };
+    }
+
+    /// Verifies the NSEC/NSEC3 records (and the zone's own SOA) of `auth` with
+    /// the authenticated keys `ks` of zone `z`, and collects them as a denial
+    /// proof together with that proof's lifetime.
+    fn authenticateDenial(
+        s: *Session,
+        auth: *const rrset_mod.Grouped,
+        target: *const Name,
+        z: *const Name,
+        ks: *const RrSet,
+    ) Allocator.Error!union(enum) { ok: Denial, failed: Failure } {
         var n_list: std.ArrayList(nsec.Record) = .empty;
         var n3_list: std.ArrayList(nsec3.Record) = .empty;
+        var proof_ttl: u32 = std.math.maxInt(u32);
         for (auth.sets) |*set| {
             const relevant = set.type == .nsec or set.type == .nsec3 or set.type == .soa;
             if (!relevant) continue;
-            if (!set.isSigned() or !set.sigs[0].rrsig.signer.eql(&z)) {
-                if (set.type == .soa and set.name.eql(&z)) return .{ .failed = fail(.missing_signature, set.name, .soa, null) };
+            // A set may carry several RRSIGs; it takes part if any of them
+            // names `z`. `verifyWithKeys` then picks the one that checks out.
+            var by_z = false;
+            for (set.sigs) |*sig| if (sig.rrsig.signer.eql(z)) {
+                by_z = true;
+            };
+            if (!by_z) {
+                if (set.type == .soa and set.name.eql(z)) return .{ .failed = fail(.missing_signature, set.name, .soa, null) };
                 continue;
             }
-            switch (try s.verifyWithKeys(set, ks)) {
-                .ok => {},
+            const v = switch (try s.verifyWithKeys(set, ks)) {
+                .ok => |x| x,
                 .err => |f| return .{ .failed = f },
-            }
-            // Denial records must not themselves be wildcard expansions.
-            if (labelsUsed(set, z) != set.name.rrsigLabelCount() and set.type != .soa) {
+            };
+            // Denial records must not themselves be wildcard expansions. The
+            // Labels value is the one from the signature that verified, so a
+            // forged extra RRSIG cannot change the outcome either way.
+            if (v.labels != set.name.rrsigLabelCount() and set.type != .soa) {
                 return .{ .failed = fail(.denial_failed, set.name, set.type, null) };
             }
+            proof_ttl = @min(proof_ttl, v.ttl);
             for (set.rdatas) |rd| switch (set.type) {
                 .nsec => {
                     const parsed = rdata.Nsec.parse(rd) catch return .{ .failed = fail(.malformed_response, set.name, .nsec, null) };
-                    try n_list.append(s.a, .{ .owner = set.name, .nsec = parsed, .zone = z });
+                    try n_list.append(s.a, .{ .owner = set.name, .nsec = parsed, .zone = z.* });
                 },
                 .nsec3 => {
-                    const rec = nsec3.Record.fromRr(set.name, rd, &z) catch |e| switch (e) {
+                    const rec = nsec3.Record.fromRr(set.name, rd, z) catch |e| switch (e) {
                         error.Ignored => continue,
                         else => return .{ .failed = fail(.malformed_response, set.name, .nsec3, e) },
                     };
@@ -750,15 +875,19 @@ const Session = struct {
             };
         }
         if (n_list.items.len == 0 and n3_list.items.len == 0) return .{ .failed = fail(.denial_missing, target.*, .nsec, null) };
-        return .{ .ok = .{ .zone = z, .nsec_recs = n_list.items, .nsec3_recs = n3_list.items } };
+        return .{ .ok = .{ .zone = z.*, .nsec_recs = n_list.items, .nsec3_recs = n3_list.items, .ttl = proof_ttl } };
     }
 
-    const ProofOutcome = union(enum) { proven: Reason, not_proven: Failure };
+    const ProofOutcome = union(enum) {
+        /// The denial proves the delegation insecure — for this long.
+        proven: struct { reason: Reason, ttl: u32 },
+        not_proven: Failure,
+    };
 
     fn proveInsecureDelegation(s: *Session, d: *const Denial, child: Name) Allocator.Error!ProofOutcome {
         if (d.nsec_recs.len > 0) {
             return switch (nsec.provesInsecureDelegation(d.nsec_recs, &child)) {
-                .proven => .{ .proven = .insecure_delegation },
+                .proven => .{ .proven = .{ .reason = .insecure_delegation, .ttl = d.ttl } },
                 .failed => .{ .not_proven = fail(.denial_failed, child, .ds, null) },
             };
         }
@@ -767,8 +896,8 @@ const Session = struct {
             .err => |o| return o,
         };
         return switch (p.provesInsecureDelegation(&child)) {
-            .proven => .{ .proven = .insecure_delegation },
-            .opt_out => .{ .proven = .nsec3_opt_out },
+            .proven => .{ .proven = .{ .reason = .insecure_delegation, .ttl = d.ttl } },
+            .opt_out => .{ .proven = .{ .reason = .nsec3_opt_out, .ttl = d.ttl } },
             .resource_limit => .{ .not_proven = fail(.resource_limit, child, .ds, null) },
             else => .{ .not_proven = fail(.denial_failed, child, .ds, null) },
         };
@@ -781,7 +910,9 @@ const Session = struct {
             .ok => |p| .{ .ok = p },
             .err => |e| switch (e) {
                 .iterations_exceeded => switch (s.v.policy.nsec3_iterations) {
-                    .insecure => .{ .err = .{ .proven = .nsec3_iterations_policy } },
+                    // The authenticated NSEC3 records are still what the
+                    // decision rests on, so their lifetime bounds it.
+                    .insecure => .{ .err = .{ .proven = .{ .reason = .nsec3_iterations_policy, .ttl = d.ttl } } },
                     .fail => .{ .err = .{ .not_proven = fail(.nsec3_iterations_exceeded, d.zone, .nsec3, null) } },
                 },
                 .inconsistent_params => .{ .err = .{ .not_proven = fail(.nsec3_inconsistent_params, d.zone, .nsec3, null) } },
@@ -807,7 +938,7 @@ const Session = struct {
                 const probe = if (soa_owner) |y| (if (sname.isSubdomainOf(&y)) y else sname) else sname;
                 return switch (try s.nameStatus(probe)) {
                     .insecure => |i| blk: {
-                        acc.markInsecure(i.reason, i.zone);
+                        acc.markInsecure(i);
                         break :blk null;
                     },
                     .signed_zone => .{ .bogus = fail(.denial_missing, sname, .nsec, null) },
@@ -822,7 +953,7 @@ const Session = struct {
             },
             .insecure => |i| {
                 if (kind == .wildcard) return .{ .bogus = fail(.denial_failed, sname, .nsec, null) };
-                acc.markInsecure(i.reason, i.zone);
+                acc.markInsecure(i);
                 return null;
             },
             .ok => |d| {
@@ -840,8 +971,8 @@ const Session = struct {
                 var p = switch (try s.nsec3Proof(&d)) {
                     .ok => |p| p,
                     .err => |o| return switch (o) {
-                        .proven => |reason| blk: {
-                            acc.markInsecure(reason, d.zone);
+                        .proven => |pr| blk: {
+                            acc.markInsecure(.{ .reason = pr.reason, .zone = d.zone, .ttl = pr.ttl });
                             break :blk null;
                         },
                         .not_proven => |f| .{ .bogus = f },
@@ -855,7 +986,7 @@ const Session = struct {
                 return switch (r) {
                     .proven => null,
                     .opt_out => blk: {
-                        acc.markInsecure(.nsec3_opt_out, d.zone);
+                        acc.markInsecure(.{ .reason = .nsec3_opt_out, .zone = d.zone, .ttl = d.ttl });
                         break :blk null;
                     },
                     .resource_limit => .{ .bogus = fail(.resource_limit, sname, .nsec3, null) },
@@ -873,7 +1004,16 @@ const Session = struct {
             .truncated, .upstream_rcode => .{ .indeterminate = f },
             else => .{ .bogus = f },
         };
-        if (qtype == .any or qtype.isMetaOrQtype()) return .{ .bogus = fail(.malformed_response, qname, qtype, null) };
+        // QTYPE=RRSIG joins ANY and the meta-types here rather than being
+        // validated: `group` reads every RRSIG as a signature and never as
+        // data, so an RRSIG answer would group into no RRset at all and be
+        // judged as NODATA. That is a wrong answer, not merely a missing one —
+        // nothing signs an RRSIG RRset, so a positive response to this query
+        // type cannot be authenticated at all. Rejecting it at the door keeps
+        // an ordinary, correctly signed response from being reported bogus.
+        if (qtype == .any or qtype == .rrsig or qtype.isMetaOrQtype()) {
+            return .{ .bogus = fail(.malformed_response, qname, qtype, null) };
+        }
         if (s.v.anchors.closest(&qname) == null) return .{ .indeterminate = fail(.no_trust_anchor, qname, qtype, null) };
 
         const ans = try rrset_mod.group(s.a, m.answer);
@@ -899,6 +1039,17 @@ const Session = struct {
                 if (findSet(ans.sets, &sname, .cname)) |c| {
                     const ct = rdata.singleName(c.rdatas[0]) catch return .{ .bogus = fail(.dname_mismatch, sname, .cname, null) };
                     if (c.rdatas.len != 1 or !ct.eql(&next)) return .{ .bogus = fail(.dname_mismatch, sname, .cname, null) };
+                    // ... except for QTYPE=CNAME, where the synthesised CNAME at
+                    // the *original* name is the answer that was asked for
+                    // (RFC 6672 §5.3.1). Redirecting past it looked for a CNAME
+                    // at the target, which a correct response does not carry —
+                    // so a valid answer came back bogus for want of a NODATA
+                    // proof nobody was obliged to send.
+                    if (qtype == .cname) {
+                        try chain.append(s.a, try s.dupeSet(c));
+                        positive = true;
+                        break;
+                    }
                 }
                 sname = next;
                 continue;
@@ -969,8 +1120,14 @@ const Session = struct {
                 return null;
             },
             .insecure => |i| {
-                acc.markInsecure(i.reason, i.zone);
+                // Bounded by the unsigned RRset's own TTL *and* by the lifetime
+                // of the proof that made unsigned data acceptable here. Only
+                // the first was applied before, so an on-path responder could
+                // put a large TTL on forged insecure data and have it outlive
+                // the NSEC/NSEC3 or DS proof it was accepted on - and the C ABI
+                // exposes `ttl` to the caller as the answer's cache duration.
                 acc.ttl = @min(acc.ttl, set.ttl);
+                acc.markInsecure(i);
                 return null;
             },
             .bogus => |f| return .{ .bogus = f },
@@ -982,6 +1139,33 @@ const Session = struct {
 fn findSet(sets: []RrSet, n: *const Name, t: Type) ?*RrSet {
     for (sets) |*s| if (s.type == t and s.class == .in and s.name.eql(n)) return s;
     return null;
+}
+
+fn deeperNameFirst(_: void, x: Name, y: Name) bool {
+    return x.labelCount() > y.labelCount();
+}
+
+/// The distinct Signer's Names carried by `sigs`, deepest first.
+///
+/// Every signer has to be tried, not just the first: an untrusted responder
+/// controls the order of the RRSIGs, and picking one signer means it can break
+/// an otherwise valid chain by prepending a single extraneous RRSIG naming a
+/// different ancestor — the real parent's valid signature would then never be
+/// checked. Deepest first is the order that matters: the most specific signer
+/// is the one the response's own chain implies, so trying it first spends the
+/// verification budget where it belongs.
+fn signerCandidates(a: Allocator, sigs: []const rrset_mod.Sig) Allocator.Error![]const Name {
+    var out: std.ArrayList(Name) = .empty;
+    for (sigs) |*sig| {
+        const signer = sig.rrsig.signer;
+        var dup = false;
+        for (out.items) |c| if (c.eql(&signer)) {
+            dup = true;
+        };
+        if (!dup) try out.append(a, signer);
+    }
+    std.mem.sort(Name, out.items, {}, deeperNameFirst);
+    return out.items;
 }
 
 /// A DNAME RRset whose owner is a proper ancestor of `n`.
