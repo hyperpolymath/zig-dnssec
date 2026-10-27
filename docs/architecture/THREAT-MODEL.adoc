@@ -146,6 +146,25 @@ Every item here is a known limitation, not a hidden one.
   as malformed; trailing zero octets are tolerated.
 * A response must answer exactly the question asked, with `QR=1` and opcode QUERY.
 
+== The C ABI (`src/interface/`)
+
+* *What C callers are trusted for* — what any C API trusts: NUL-terminated strings, a
+  verdict pointer to a whole `zig_dnssec_verdict`, and `text_cap` writable bytes at
+  `text`. Breaking that is undefined behaviour. The library itself checks NULL
+  pointers, unknown policy bits, meta-type and zero query types, and malformed names,
+  anchors and traces, and reports each as a status with `security` NONE.
+* *The transport callback is untrusted* — its responses go through the same strict
+  parser and validation as DoH responses, and a reported length beyond the buffer is a
+  failed exchange. A failure of the first query is `ZIG_DNSSEC_ERR_QUERY_FAILED`; a
+  failure of a later DS or DNSKEY fetch is a verdict (`bogus` or `indeterminate`).
+* *The caller supplies the time* — the library never reads the clock, so a wrong `now`
+  gives wrong signature-validity decisions.
+* No global state; each call allocates with Zig's thread-safe general-purpose allocator
+  and frees everything before it returns. The shared object exports the six header
+  functions and nothing else, and links no libc.
+* The Idris2 wrapper reads the verdict struct little-endian and is tested on x86_64
+  Linux only.
+
 == Trust-anchor handling assumptions
 
 * Anchors are *static configuration*: DS and/or DNSKEY records in presentation format

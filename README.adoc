@@ -91,6 +91,15 @@ $ ./zig-out/bin/dnssec-stub --doh https://cloudflare-dns.com/dns-query dnssec-fa
 verdict=bogus reason=dnskey_not_authenticated at=dnssec-failed.org. type=dnskey
 ----
 
+=== From C, Idris2 and other languages
+
+`zig build ffi` builds `libzig_dnssec` (static and shared, pure Zig, no libc) and
+installs `zig_dnssec.h`. The header is the contract: a verdict whose security is never
+`SECURE` unless the call succeeded, and answer text only for `SECURE` and `INSECURE`.
+The caller supplies the transport as a callback. An Idris2 model of the interface in
+`src/interface/Abi/` states the same rule as a type. See
+link:src/interface/README.adoc[`src/interface/README.adoc`].
+
 [[ai-install]]
 == AI-Assisted Installation (Recommended)
 
@@ -121,7 +130,9 @@ is sent anywhere. Running the tests needs no network. Only the live examples abo
 
 [source,console]
 ----
-zig build test                         # unit, RFC vector, denial, replay and fuzz smoke tests
+zig build test                         # unit, RFC vector, denial, replay, fuzz smoke and C ABI tests
+idris2 --typecheck src/interface/abi.ipkg   # proofs of the Idris2 ABI model
+just abi-e2e                           # Idris2 -> C ABI -> Zig end to end
 zig build fuzz --fuzz=500K -Doptimize=ReleaseSafe      # coverage-guided fuzzing
 zig build fuzz-tool -Doptimize=ReleaseSafe && ./zig-out/bin/dnssec-fuzz all 60
 tests/crosscheck/make-zones.sh && tests/crosscheck/servers.sh start && tests/crosscheck/run.sh

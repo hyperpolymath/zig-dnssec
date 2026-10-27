@@ -1,3 +1,8 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= ffi Logic
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= Zig side of the C ABI
+
+`include/zig_dnssec.h` is the contract, `src/main.zig` implements it in pure Zig, and
+`test/` checks both the behaviour and the agreement with the Idris2 model. Built from
+the repository root: `zig build ffi` (libraries and header into `zig-out/`) and
+`zig build test`. See `../README.adoc`.

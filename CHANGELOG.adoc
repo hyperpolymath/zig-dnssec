@@ -25,6 +25,11 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
   recorded responses replayed offline, mutation attacks, fuzz targets with a
   corpus; a cross-check against Unbound and ldns (`tests/crosscheck/`).
 * `zig-ci` workflow; container image (`build/container/Containerfile`).
+* C ABI (`zig build ffi`): `zig_dnssec.h` as the contract, a pure-Zig
+  `libzig_dnssec` checked against it at compile time, and an Idris2 model of
+  the interface (`src/interface/Abi/`) whose result type cannot carry an
+  answer for a bogus or indeterminate verdict; tests keep the three in step,
+  and an Idris2 end-to-end test (`just abi-e2e`) runs in CI.
 
 ==== Fixed
 
@@ -36,6 +41,9 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 ==== Changed
 
 * Toolchain pin: Zig 0.16.0 → 0.17.0 (`mise.lock`).
+* `src/interface/`: the template's example ABI/FFI seam is replaced by the
+  zig-dnssec C ABI; its separate `ffi/build.zig` is gone (the root
+  `build.zig` builds and tests the seam).
 
 === Inherited from rsr-template-repo at mint (2026-10-13)
 
