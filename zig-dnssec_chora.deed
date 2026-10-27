@@ -1055,7 +1055,7 @@
     ; (vocabulary 0.3.0) and checked with standards scripts/check-rsr-profile.sh.
     ; Each capability names a surface this tree carries; add one only with
     ; the module it gates.
-    :capabilities ("zig" "idris2" "bash" "library" "ffi" "abi" "container" "reproducible-build" "benchmarks" "governance-tier" "published-package" "formal-proofs"))
+    :capabilities ("zig" "idris2" "bash" "library" "cli" "ffi" "abi" "container" "reproducible-build" "benchmarks" "governance-tier" "published-package" "formal-proofs"))
   ; variant — provenance contract (ADR-0002 shape; ADR-0003 use).
   ; Records what this repo was minted from so the drift gate
   ; (scripts/check-variant-drift.sh <parent-checkout>) and future
