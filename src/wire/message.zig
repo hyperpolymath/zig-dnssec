@@ -235,9 +235,23 @@ fn readRr(a: std.mem.Allocator, bytes: []const u8, pos: *usize, section: Section
     if (t == .opt and section != .additional) return error.BadOpt;
     if ((t == .tsig or t.toInt() == 249) and section != .additional) return error.BadRecordType;
 
-    // Expanded RDATA can grow by at most 255 octets per embedded name; no
-    // supported layout has more than four names.
-    const cap = rdlen + 4 * name_mod.max_wire_len;
+    // Expanded RDATA can grow by at most 255 octets per embedded name, so the
+    // headroom has to come from the layout rather than from a fixed allowance.
+    // A fixed 4*255 on every record - including opaque types whose RDATA cannot
+    // grow at all - let an untrusted upstream turn one 65535-octet message into
+    // ~6 MB of arena: about 5,950 minimal RRs of 11 octets each, every one
+    // allocated ~1 KB. `Session.fetch` caches each fetched message, so a single
+    // validation at the default fetch budget could hold hundreds of MB. That is
+    // the work-amplification class the threat model puts in scope. No supported
+    // layout has more than two names, so this is also exact rather than an
+    // over-estimate.
+    var names: usize = 0;
+    if (rdata_mod.layoutOf(t)) |lay| {
+        for (lay.fields) |field| {
+            if (field == .name) names += 1;
+        }
+    }
+    const cap = rdlen + names * name_mod.max_wire_len;
     const buf = try a.alloc(u8, cap);
     const expanded = try rdata_mod.expand(bytes, pos.*, rdlen, t, buf);
     if (expanded.len > max_message_len) return error.MalformedRdata;

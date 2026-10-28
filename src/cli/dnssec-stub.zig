@@ -41,7 +41,21 @@ fn usage() noreturn {
     std.process.exit(4);
 }
 
+/// The exit contract advertised in `usage` and in the C ABI's companion docs is
+/// 0 = secure, 1 = insecure, 2 = bogus, 3 = indeterminate, 4 = usage/transport.
+/// An error escaping `main` becomes exit status 1, which this CLI has already
+/// sold as "insecure" — so a missing `--anchors` file, an unparseable trust
+/// anchor, a refused `http://` `--doh` URL, a bad `--ca`, or an unwritable
+/// `--record` file each reported a proven-insecure verdict to any script or
+/// harness reading the status. Setup and I/O failures are mapped to 4.
 pub fn main(init: std.process.Init) !u8 {
+    return run(init) catch |e| {
+        std.debug.print("dnssec-stub: {s}\n", .{@errorName(e)});
+        return 4;
+    };
+}
+
+fn run(init: std.process.Init) !u8 {
     const gpa = init.gpa;
     const arena = init.arena.allocator();
     const io = init.io;

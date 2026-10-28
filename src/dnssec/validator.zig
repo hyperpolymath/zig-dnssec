@@ -515,6 +515,12 @@ const Session = struct {
                 // provably insecure.
                 const y = soa_owner orelse (zone.parent() orelse return .{ .bogus = fail(.denial_missing, zone, .ds, null) });
                 if (!zone.isStrictSubdomainOf(&y)) return .{ .bogus = fail(.malformed_response, zone, .ds, null) };
+                // The SOA owner is unauthenticated data, so ancestry alone is
+                // not enough. If an anchor sits between the hinted zone and the
+                // child, that zone's insecurity says nothing about the anchored
+                // subtree below it - the same closest-anchor bypass the RRSIG
+                // signer check refuses on the answer and denial paths.
+                if (s.signerAboveAnchor(&y, &zone)) return .{ .bogus = fail(.denial_missing, zone, .ds, null) };
                 return switch (try s.nameStatus(y)) {
                     .insecure => |i| .{ .insecure = i },
                     .signed_zone => .{ .bogus = fail(.denial_missing, zone, .ds, null) },
@@ -542,9 +548,20 @@ const Session = struct {
 
     const DsUse = struct { usable: std.ArrayList(rdata.Ds), unsupported_seen: bool };
 
+    /// Digest strength, weakest last. Unknown types rank 0 so they can never
+    /// displace a digest the validator can actually check.
+    fn digestRank(dt: types.DigestType) u8 {
+        return switch (dt) {
+            .sha1 => 1,
+            .sha256 => 2,
+            .sha384 => 3,
+            else => 0,
+        };
+    }
+
     fn usableDs(s: *Session, ds_rdatas: []const []const u8) Allocator.Error!DsUse {
         var out: DsUse = .{ .usable = .empty, .unsupported_seen = false };
-        var has_strong = false;
+        var best: ?types.DigestType = null;
         for (ds_rdatas) |rd| {
             const d = rdata.Ds.parse(rd) catch continue;
             const ok_digest = keys.digestSupported(d.digest_type) and (d.digest_type != .sha1 or s.v.policy.allow_sha1);
@@ -553,17 +570,51 @@ const Session = struct {
                 out.unsupported_seen = true;
                 continue;
             }
-            if (d.digest_type != .sha1) has_strong = true;
+            if (best == null or digestRank(d.digest_type) > digestRank(best.?)) best = d.digest_type;
             try out.usable.append(s.a, d);
         }
-        if (has_strong) {
-            // RFC 4509 §3: ignore SHA-1 DS when SHA-256 (or stronger) exists.
+        // RFC 4509 §3, extended to SHA-384 by RFC 6605 §5: when a DS RRset
+        // offers more than one digest type the validator supports, only the
+        // strongest may be used. Falling back to a weaker digest because the
+        // stronger one matched no DNSKEY is precisely the downgrade those
+        // sections forbid - the whole RRset is signed by the parent, so an
+        // attacker who cannot forge the strong digest should not get the weak
+        // one accepted instead. This previously dropped SHA-1 only, leaving
+        // SHA-256 and SHA-384 both usable and letting keysFromDs take whichever
+        // matched first.
+        if (best) |b| {
             var i: usize = 0;
             while (i < out.usable.items.len) {
-                if (out.usable.items[i].digest_type == .sha1) _ = out.usable.swapRemove(i) else i += 1;
+                if (out.usable.items[i].digest_type != b) _ = out.usable.swapRemove(i) else i += 1;
             }
         }
         return out;
+    }
+
+    /// A denial proof's lifetime bounds how long the *zone state* is known, but
+    /// the negative answer built from it may only be cached for the SOA's own
+    /// negative TTL. Without that bound an on-path responder could forge an
+    /// NXDOMAIN below a proven-insecure delegation and keep it cached for the
+    /// much longer DS/NSEC lifetime, which the C ABI exposes as the answer's
+    /// cache duration. A wildcard proof supports a positive answer, so it is
+    /// left alone.
+    fn boundNegative(auth: *const rrset_mod.Grouped, kind: DenialKind, acc: *Acc) void {
+        if (kind == .wildcard) return;
+        acc.ttl = @min(acc.ttl, negativeTtl(auth) orelse 0);
+    }
+
+    /// RFC 2308 §5: a negative answer may be cached for min(the SOA record's
+    /// own TTL, SOA MINIMUM). Null when the response carries no SOA, in which
+    /// case nothing about it is cacheable.
+    fn negativeTtl(auth: *const rrset_mod.Grouped) ?u32 {
+        for (auth.sets) |*set| {
+            if (set.type != .soa) continue;
+            for (set.rdatas) |rd| {
+                const soa = rdata.Soa.parse(rd) catch continue;
+                return @min(set.ttl, soa.minimum);
+            }
+        }
+        return null;
     }
 
     fn unsupportedOutcome(s: *Session, zone: Name, proof_ttl: u32) KeyStatus {
@@ -696,7 +747,10 @@ const Session = struct {
             switch (try s.collectDenial(&auth, &x, true)) {
                 .none => |soa_owner| {
                     if (soa_owner) |y| {
-                        if (x.isStrictSubdomainOf(&y)) return keyToName(try s.zoneStatus(y), y);
+                        // As in computeZoneStatus: ancestry is not sufficient, and
+                        // a hint reaching over a closer anchor is ignored so the
+                        // walk continues to the real parent instead.
+                        if (x.isStrictSubdomainOf(&y) and !s.signerAboveAnchor(&y, &x)) return keyToName(try s.zoneStatus(y), y);
                     }
                     x = x.parent() orelse return .{ .bogus = fail(.denial_missing, start, .ds, null) };
                 },
@@ -767,7 +821,12 @@ const Session = struct {
             if (!set.isSigned()) continue;
             for (set.sigs) |*sig| {
                 const signer = sig.rrsig.signer;
-                const ok_rel = if (strict_parent) target.isStrictSubdomainOf(&signer) else target.isSubdomainOf(&signer);
+                // `strict_parent` asks for a signer that is a proper ancestor
+                // of the target. The root has none, so demanding one discarded
+                // the root's own authenticated NSEC/SOA proof for a legitimate
+                // `. DS` NODATA and reported bogus/denial_missing. At the root
+                // the signer can only be the root itself.
+                const ok_rel = if (strict_parent and !target.isRoot()) target.isStrictSubdomainOf(&signer) else target.isSubdomainOf(&signer);
                 if (ok_rel) try sigs.append(s.a, sig.*);
             }
         }
@@ -935,10 +994,19 @@ const Session = struct {
                 // No signed proof at all: only acceptable in an insecure zone.
                 // When the response names its zone (SOA), test that zone: an
                 // unsigned denial claiming to come from a signed zone is bogus.
-                const probe = if (soa_owner) |y| (if (sname.isSubdomainOf(&y)) y else sname) else sname;
+                // The SOA owner is a hint from unauthenticated data. It is used
+                // only when the target really is inside it AND no configured
+                // anchor sits between the two; otherwise a forged SOA could
+                // point at an insecure ancestor of a secure island and have that
+                // island's negative answer accepted with no proof at all.
+                const probe = if (soa_owner) |y|
+                    (if (sname.isSubdomainOf(&y) and !s.signerAboveAnchor(&y, &sname)) y else sname)
+                else
+                    sname;
                 return switch (try s.nameStatus(probe)) {
                     .insecure => |i| blk: {
                         acc.markInsecure(i);
+                        boundNegative(auth, kind, acc);
                         break :blk null;
                     },
                     .signed_zone => .{ .bogus = fail(.denial_missing, sname, .nsec, null) },
@@ -954,10 +1022,12 @@ const Session = struct {
             .insecure => |i| {
                 if (kind == .wildcard) return .{ .bogus = fail(.denial_failed, sname, .nsec, null) };
                 acc.markInsecure(i);
+                boundNegative(auth, kind, acc);
                 return null;
             },
             .ok => |d| {
                 acc.ttl = @min(acc.ttl, d.ttl);
+                boundNegative(auth, kind, acc);
                 if (d.nsec_recs.len > 0) {
                     const r = switch (kind) {
                         .nxdomain => nsec.provesNxDomain(d.nsec_recs, &sname),

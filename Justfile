@@ -186,18 +186,18 @@ crg-grade:
     @# not the template's READINESS.md; reading only the latter silently reported
     @# the fallback grade for the wrong reason. AsciiDoc bold is `*Current Grade:*`,
     @# Markdown bold is `**Current Grade:**`, so both spellings are matched.
-    @f="docs/status/READINESS.adoc"; [ -f "$$f" ] || f="READINESS.md"; \
-    grade=$$(grep -oP '\*+Current Grade:\*+\s*\K[A-FX]' "$$f" 2>/dev/null | head -1); \
-    [ -z "$$grade" ] && grade="X"; \
-    echo "$$grade"
+    @f="docs/status/READINESS.adoc"; [ -f "$f" ] || f="READINESS.md"; \
+    grade=$(grep -oP '\*+Current Grade:\*+\s*\K[A-FX]' "$f" 2>/dev/null | head -1); \
+    [ -z "$grade" ] && grade="X"; \
+    echo "$grade"
 
 # Print a shields.io CRG badge for embedding in README files
 # Looks for '**Current Grade:** X' in READINESS.md; falls back to X
 crg-badge:
-    @f="docs/status/READINESS.adoc"; [ -f "$$f" ] || f="READINESS.md"; \
-    grade=$$(grep -oP '\*+Current Grade:\*+\s*\K[A-FX]' "$$f" 2>/dev/null | head -1); \
-    [ -z "$$grade" ] && grade="X"; \
-    case "$$grade" in \
+    @f="docs/status/READINESS.adoc"; [ -f "$f" ] || f="READINESS.md"; \
+    grade=$(grep -oP '\*+Current Grade:\*+\s*\K[A-FX]' "$f" 2>/dev/null | head -1); \
+    [ -z "$grade" ] && grade="X"; \
+    case "$grade" in \
       A) color="brightgreen" ;; \
       B) color="green" ;; \
       C) color="yellow" ;; \
@@ -206,7 +206,7 @@ crg-badge:
       F) color="critical" ;; \
       *) color="lightgrey" ;; \
     esac; \
-    echo "[![CRG $$grade](https://img.shields.io/badge/CRG-$$grade-$$color?style=flat-square)](https://github.com/hyperpolymath/standards/tree/main/component-readiness-grades)"
+    echo "[![CRG $grade](https://img.shields.io/badge/CRG-$grade-$color?style=flat-square)](https://github.com/hyperpolymath/standards/tree/main/component-readiness-grades)"
 
 # Run the full merge-requirement test suite (ALL categories)
 # Per STANDING rule: P2P + E2E + aspect + execution + lifecycle + bench

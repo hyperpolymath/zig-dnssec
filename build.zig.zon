@@ -72,6 +72,11 @@
         "build.zig",
         "build.zig.zon",
         "src",
+        // `build.zig` advertises a `test` step whose modules live under tests/
+        // and embed files from tests/testdata/. Without this, `zig build test`
+        // in a package fetched through the Zig package manager fails on missing
+        // sources: the step is advertised but its inputs are not shipped.
+        "tests",
         // For example...
         //"LICENSE",
         //"README.md",

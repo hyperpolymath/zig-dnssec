@@ -87,6 +87,82 @@ attacker-influenced data.
 * `build/container/Containerfile`: the `crosscheck` target's `CMD` chained
   `servers.sh stop` with `;`, so its exit status masked the cross-check's.
 
+A second review cycle, over the merged milestone-1 tree, raised twelve more
+findings. Eleven are fixed here; each is verified against the code as merged,
+and the security ones carry a regression test that was confirmed to fail
+without the fix (127 tests, up from 123).
+
+* *Security:* an unsigned negative answer's SOA owner is unauthenticated data,
+  and three paths used it to choose which zone got the insecurity check,
+  guarded only by an ancestry test. Ancestry is not enough: with an anchor
+  between the hinted zone and the target, the insecurity of an ancestor says
+  nothing about the anchored subtree below it, so a forged SOA could dispose
+  of a negative answer inside a secure island with no proof at all.
+  `computeZoneStatus`, `nameStatus` and `proveDenial` now apply the same
+  closest-anchor refusal the RRSIG signer check uses.
+* *Security:* `usableDs` dropped SHA-1 when any stronger digest was present
+  but left SHA-256 and SHA-384 both usable, so `keysFromDs` accepted
+  whichever matched first and a child could be accepted through the weaker
+  digest — the downgrade RFC 4509 §3 forbids, extended to SHA-384 by RFC 6605
+  §5. Only the strongest supported digest class present is now kept.
+* *Work amplification:* `readRr` sized every record's expansion buffer at
+  `rdlen + 4 * 255`, including opaque types whose RDATA cannot grow at all.
+  About 5,950 minimal 11-octet RRs fit in one 65535-octet message, so an
+  untrusted upstream turned each message into ~6 MB of arena; `Session.fetch`
+  caches every fetched message, so one validation at the default budget could
+  hold hundreds of MB. The headroom now comes from the layout's actual name
+  count (no supported layout has more than two), and is zero for opaque types.
+* `dnssec-stub` exited 1 — the status it documents as "insecure" — for every
+  setup and I/O failure, because an error escaping `main` becomes exit 1. A
+  missing `--anchors` file, an unparseable trust anchor, a refused `http://`
+  `--doh` URL, a bad `--ca` or an unwritable `--record` file each reported a
+  proven-insecure verdict to any script or harness reading the status. Those
+  are now mapped to the documented 4.
+* `formatRr` emitted `(256-octet key)` for a DNSKEY and `(types)` for the
+  NSEC/NSEC3 bitmaps. Neither is RDATA, and both the CLI and the C ABI promise
+  presentation-format answer records. DNSKEY now emits base64 (RFC 4034 §2.2)
+  and the bitmaps are enumerated as mnemonics; a key too large for the stack
+  buffer falls back to RFC 3597 generic form for the whole RDATA.
+* A `. DS` NODATA was always `bogus`/`denial_missing`: the strict-parent rule
+  asks for a signer that is a proper ancestor of the target, and the root has
+  none, so the root's own authenticated NSEC/SOA proof was discarded. At the
+  root the signer can only be the root itself.
+* A negative answer below a proven-insecure delegation was bounded only by the
+  denial proof's lifetime, ignoring the SOA negative TTL, so a forged NXDOMAIN
+  could be cached for the much longer DS/NSEC lifetime (RFC 2308 §5). It is
+  now also bounded by min(SOA record TTL, SOA MINIMUM), and by zero when the
+  response supplies no cacheable SOA.
+* `parseTtl` accumulated compound TTLs in plain `u64`, so a long enough
+  sequence such as repeated `4294967295w` overflowed before the final range
+  check: a panic in Debug and ReleaseSafe, and a wrapped, wrongly small TTL
+  otherwise, from the public zone parser. Accumulation is checked and bails as
+  soon as the sum cannot fit `u32`.
+* `parseRrsigTime` accepted impossible calendar dates — every month ran to
+  day 31 — and `daysFromCivil` normalised rather than failed, so
+  `20230231000000` was encoded as a March timestamp. The day is now validated
+  against the month and both century leap-year rules.
+* `build.zig.zon` shipped only `build.zig`, `build.zig.zon` and `src`, so
+  `zig build test` in a package fetched through the Zig package manager failed
+  on missing sources: the `test` step was advertised but its inputs under
+  `tests/` and `tests/testdata/` were excluded. `tests` is now in `.paths`.
+* `just crg-grade` and `just crg-badge` could never run. `just` does not treat
+  `$$` as an escape — it passes both octets to the shell, where `$$` is the PID
+  — so `grade=$$(grep …)` was a bash syntax error and the recipes exited 2.
+  They now use `$`, and read `docs/status/READINESS.adoc`, which is where this
+  repo keeps its assessment; they previously read `READINESS.md`, which does
+  not exist here, and so returned the fallback grade for the wrong reason. The
+  same defect is in the upstream contractile copy.
+
+Not fixed in this cycle, with reasons rather than silence: the deed's
+`:parent-pin` / `:template-commit` names a commit that no longer exists in
+`hyperpolymath/rsr-template-repo`, so `check-variant-drift.sh` cannot be run
+at all (see `docs/reports/VERIFICATION.adoc`); base-image digest pinning and
+the container build stages' user model are left to the estate-wide pinning
+decision because no registry or container engine is reachable from here to
+verify either; and the negative-cache-TTL bound above has no test, because no
+recorded fixture has an SOA MINIMUM below its own denial proof's TTL, so the
+bound never binds in the corpus.
+
 ==== Changed
 
 * `scripts/validate-template.sh` now honours the repo deed's
