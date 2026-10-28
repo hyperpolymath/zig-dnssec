@@ -957,6 +957,7 @@ const Session = struct {
                 return null;
             },
             .ok => |d| {
+                acc.ttl = @min(acc.ttl, d.ttl);
                 if (d.nsec_recs.len > 0) {
                     const r = switch (kind) {
                         .nxdomain => nsec.provesNxDomain(d.nsec_recs, &sname),
