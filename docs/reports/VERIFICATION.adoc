@@ -1,0 +1,281 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= zig-dnssec: what has been verified, and what has not
+:toc:
+
+Status as of 2026-10-13, Zig 0.17.0, Idris2 0.7.0. Every claim below is tagged with the
+estate's five statuses and names the artefact that discharges it. The PROVEN rows are
+about the C ABI seam (`src/interface/`) and are checked by Idris2; nothing about the
+validator's own logic is proved yet.
+
+[cols="1,4",options="header"]
+|===
+| Status | Meaning here
+| PROVEN | discharged by a machine-checked proof (Idris2 typecheck of `src/interface/abi.ipkg`)
+| TESTED | discharged by a test or run that is in the repository and reproducible
+| ASSUMED | relied on without being checked here
+| DESIGNED | built and reasoned about, but not exercised by a test
+| OPEN | not done
+|===
+
+== Summary
+
+[cols="3,1,4",options="header"]
+|===
+| Claim | Status | Artefact
+
+| Malformed messages are rejected without crashing; parse → encode → parse round-trips
+| TESTED
+| `src/wire/*.zig` unit tests (every strict prefix of a valid message rejected; pointer
+  loops, forward pointers, header pointers, extended labels, oversized names, bad OPT,
+  meta-types, trailing data); fuzz targets `decodeRaw`, `decodeMutated` (below)
+
+| Name compression follows RFC 1035 §4.1.4
+| TESTED
+| `src/wire/name.zig` "RFC 1035 §4.1.4 compression example"; `builder.zig` round trips
+
+| Canonical ordering and form (RFC 4034 §6, RFC 6840 §5.1)
+| TESTED
+| `name.zig` RFC 4034 §6.1 ordering example; `rdata.zig` canonical-form tests; every
+  signature in two RFC example zones verifies (below)
+
+| RSA/SHA-1, RSA/SHA-256, RSA/SHA-512, ECDSA P-256/P-384, Ed25519 verification
+| TESTED
+| `tests/vectors.zig`: RFC 5702 §6.1–6.2, RFC 6605 §6.1–6.2, RFC 8080 §6.1 (both
+  examples, crypto layer), all 27 RSASHA1 signatures of RFC 4035 Appendix A, all 30
+  RSASHA1-NSEC3-SHA1 signatures of RFC 5155 Appendix A; negative cases (tampered data,
+  wrong key, flags, protocol, owner, bit-flipped signature, validity window)
+
+| DS digests SHA-1, SHA-256, SHA-384 and key tags
+| TESTED
+| RFC 4034 §5.4, RFC 4509 §2.3, RFC 6605, RFC 8080 vectors in `tests/vectors.zig`
+
+| NSEC3 hashing
+| TESTED
+| all 12 hash vectors of RFC 5155 Appendix A (`src/dnssec/nsec3.zig`)
+
+| NSEC and NSEC3 proofs (NXDOMAIN, NODATA, ENT, wildcard, wildcard NODATA, insecure
+  delegation, Opt-Out; RFC 6840 §4.1/§4.3/§4.4 restrictions)
+| TESTED
+| `tests/denial.zig`: every Appendix B example of RFC 4035 and RFC 5155, each record
+  authenticated first; synthetic edge cases in `nsec.zig`
+
+| Chain of trust: agreement with Unbound on 263 queries over 22 zones
+| TESTED
+| `tests/crosscheck/REPORT.adoc`; replayed offline in `tests/replay.zig`
+
+| Expired signatures, not-yet-valid signatures, wrong key, missing chain link, tampered
+  records all fail validation
+| TESTED
+| cross-check zones `expired`, `notyet`, `wrongkey`, `nodnskey`, `tampered`, `badsig`;
+  13 mutation attacks in `tests/replay.zig` (stripped answer and DS and root
+  signatures, DS removed without proof, DNSKEY removed, denial removed or unsigned,
+  wildcard without proof, positive answer relabelled NXDOMAIN, ...)
+
+| Failures are never reported as insecure
+| TESTED (for the cases above) / DESIGNED (in general)
+| the mutation tests assert `bogus`; the type of `Verdict` makes the answer unreachable
+  from failure arms, and at the C ABI seam the Idris2 model makes it unrepresentable
+  (PROVEN row above). A proof about the validator's own decisions is OPEN (see the
+  estate note below).
+
+| Resource limits (fetches, signatures, failures per RRset, NSEC3 hashes)
+| TESTED
+| `tests/replay.zig` budget cases; `tests/denial.zig` hash budget
+
+| C ABI seam, Idris2 model: every status, security and reason code round-trips; code 0
+  decodes to no verdict; the verdict struct's fields are aligned, in order, not
+  overlapping, and its size is a multiple of its alignment; an `Outcome` for `Bogus` or
+  `Indeterminate` cannot hold an answer, and `answerOf` cannot be applied to one
+| PROVEN
+| `src/interface/Abi/Types.idr`, `Layout.idr`, `Foreign.idr` (no `believe_me` or
+  `assert_total`; `%default total`); `idris2 --typecheck src/interface/abi.ipkg`
+
+| The Idris2 model describes the real interface: codes, field offsets and sizes, struct
+  size, `%foreign` parameter kinds agree with the C header as the C compiler sees it; the
+  Zig exports have exactly the header's types; every validator reason has a header code
+| TESTED (model ↔ header) / checked at compile time (Zig ↔ header)
+| `src/interface/ffi/test/seam_test.zig`; `exportChecked` and `reasonCode` in
+  `src/interface/ffi/src/main.zig`. Eleven deliberate mismatches, one of each kind, were
+  each caught when this was written
+
+| C ABI fail-closed rules: security NONE on every non-OK status, no answer text for
+  bogus verdicts (all 51 recorded bogus scenarios), unknown policy bits and meta-types
+  rejected, buffer sizing, callback transport, no leaks, allocation failure at every point
+| TESTED
+| `src/interface/ffi/test/abi_test.zig` (through the header's declarations)
+
+| Idris2 -> C ABI -> Zig end to end
+| TESTED
+| `just abi-e2e` (`src/interface/E2e/Main.idr`, 9 checks over recorded responses);
+  `abi-seam` job in `.github/workflows/zig-ci.yml`
+
+| Live validation against the real root
+| TESTED (manually, 2026-10-13)
+| `dnssec-stub` over Cloudflare DoH through an HTTP CONNECT proxy: `example.com A`
+  secure; `nlnetlabs.nl` NXDOMAIN secure; `google.com A` insecure (NSEC3 Opt-Out in
+  `com`); `dnssec-failed.org A` and `rhybar.cz A` bogus; `. DNSKEY` secure. On that date
+  the root DNSKEY RRset was signed only by KSK-2024 (tag 38696). Not automated: CI has
+  no network policy for it.
+
+| DoH transport (TLS, certificate checks, CONNECT proxy, response checks)
+| TESTED
+| every cross-check query runs through it (local test CA, haproxy); live queries above
+
+| Container build and test
+| TESTED
+| `build/container/Containerfile --target test` built on Wolfi with the
+  checksum-verified Zig 0.17.0 tarball; all 110 tests (C ABI tests included) passed
+  inside it
+
+| `crosscheck` and `runtime` container targets
+| DESIGNED
+| written, not built here (Wolfi package names for NSD/ldns unverified)
+
+| DNSKEY (as opposed to DS) trust anchors; anchors below the root
+| DESIGNED
+| code in `validator.zig` (`anchoredKeys`); only `TrustAnchors.closest` is unit-tested
+
+| Correctness of Zig's `std.crypto` primitives and TLS client
+| ASSUMED
+| upstream Zig; not reviewed here
+
+| Unbound 1.19.2 as the reference oracle
+| ASSUMED
+| disagreements were each investigated; an Unbound bug shared with ours would not show
+
+| The RFC example vectors are correct
+| ASSUMED, except RFC 8080 §6 (see finding below)
+|
+
+| Independent review
+| OPEN
+| recommended before any reliance
+
+| Ed448, GOST, SM2; DNS-over-QUIC; HTTP/2; RFC 5011
+| OPEN
+| see `docs/architecture/THREAT-MODEL.adoc`
+|===
+
+== Cross-check detail
+
+263 queries (13 per leaf zone plus root, TLD, DNAME, Opt-Out and DS-at-non-cut
+queries), run by `tests/crosscheck/run.sh`:
+
+* *vs Unbound, default policy: 17 disagreements.* 12 are the Ed448 zone (we cannot
+  verify Ed448: `bogus/unsupported_algorithm`; Unbound: secure) and 5 are negative
+  answers from the zone with 200 NSEC3 iterations (`bogus/nsec3_iterations_exceeded`;
+  Unbound: insecure). Both are deliberate default policies.
+* *vs Unbound, RFC-permissive policy: 12 disagreements*, all Ed448 (ours: insecure).
+* *vs ldns `drill -S`: 33 outcomes incompatible with ours.* 16 are the Ed448 and
+  iteration cases. In the other 17 Unbound agrees with us and `drill -S` is coarser:
+  nine NSEC/NSEC3 empty-non-terminal or wildcard-NODATA proofs it does not chase, three
+  Opt-Out answers it reports as secure (RFC 5155 §9.2 says they are not), two DNAME
+  answers it does not follow, one CNAME whose (tampered) target it does not validate,
+  and two DNSKEY queries on the expired and not-yet-valid zones that it reports as
+  successful.
+* The first run found a real bug: a DNAME answer was rejected because the unsigned
+  synthesised CNAME was examined before the DNAME. Fixed; DNAME is now processed first.
+
+== Fuzzing detail
+
+* *Coverage-guided* (`zig build fuzz --fuzz=3M -Doptimize=ReleaseSafe`): decoder on raw
+  bytes, decoder on mutated recorded responses, NSEC3 parser and proofs, presentation
+  parser: 12.0 million runs in total ("Unique runs: 8887", coverage 1289 of 11272
+  instrumented PCs, in the fuzzer's own report). An earlier
+  500K run *found an integer overflow* in name decoding (u8 length arithmetic at the
+  255-octet boundary). Fixed; the crashing input is in `tests/fuzz/corpus/` and is
+  replayed by `zig build test`.
+* *Differential validator target*: fails if a mutation of any recorded response yields a
+  secure answer that differs from the unmutated one. Results are in the table below.
+* *Standalone mutation fuzzer* (`dnssec-fuzz`, ReleaseSafe, seed `0x2026`, 60 s each):
+  see the table below. These numbers count cheap rejections too; the coverage-guided
+  run is the stronger evidence.
+
+include::FUZZ-RESULTS.adoc[]
+
+== The milestone-1 review cycle
+
+Milestone 1 was reviewed externally before merge (`hyperpolymath/zig-dnssec`#4,
+two automated review passes). Twelve findings were raised against
+`src/dnssec/validator.zig`, `src/dnssec/rrset.zig`, `src/wire/name.zig`,
+`src/wire/rdata.zig`, `src/stub/doh.zig` and `build/container/Containerfile`.
+All twelve are fixed; the two that mattered most are described in
+`docs/architecture/THREAT-MODEL.adoc` §"What the milestone-1 review found".
+
+The test count went from 111 to 123. The twelve additions are:
+
+* four unit tests in the sources they guard (`wire/name.zig` relative-name
+  length overflow, `wire/rdata.zig` SVCB/HTTPS canonical form,
+  `dnssec/rrset.zig` skew-bounded `effectiveTtl`, `stub/doh.zig` query
+  component in the request target);
+* seven replay tests in `tests/replay.zig`, built from the recorded
+  cross-check fixtures by rewriting only fields an RRSIG does not cover — the
+  question section, the received TTLs, and the presence and content of
+  additional RRSIGs — plus one positive control that an anchored island below
+  an insecure delegation validates as `secure`;
+* one C ABI case in `src/interface/ffi/test/abi_test.zig` (`QTYPE=RRSIG` is
+  refused with `ZIG_DNSSEC_ERR_INVALID_ARGUMENT`).
+
+*Negative controls.* A regression test that passes on both the broken and the
+fixed code proves nothing. Reverting `src/dnssec/validator.zig` and
+`src/dnssec/rrset.zig` to their pre-fix state makes seven of the seven new
+replay tests fail, each with the symptom its finding describes: a tampered
+answer accepted as `insecure` under an island anchor; a forged NXDOMAIN
+accepted as `insecure_delegation`; a valid chain broken by one extraneous DS
+RRSIG; a valid wildcard answer rejected because of a forged `Labels` field; an
+`insecure` answer cached for the attacker-chosen 86400 s; `QTYPE=CNAME` below
+a DNAME returning `indeterminate`; and `QTYPE=RRSIG` returning `indeterminate`
+rather than being refused. The positive control passed in both states, as it
+should. The `wire/name.zig` test aborts the pre-fix build outright — the
+overflow is a checked-arithmetic panic in Debug and ReleaseSafe, and an
+out-of-bounds copy in an unchecked mode.
+
+Two things this evidence does *not* establish. The fixtures are the 22 zones
+of `tests/crosscheck/`, so a finding that needs a signed zone strictly below
+an unsigned delegation cannot be built from them without new key material; the
+island tests place the trust anchor below the insecure delegation instead,
+which exercises the same code path with different key provenance. And no new
+signed zone was generated for this cycle (`ldns-signzone` and `kskgen` were not
+available), so every fixture is a recorded or minimally rewritten Unbound
+response.
+
+== Findings outside this code
+
+* *The repo deed's template pin cannot be fetched, so the variant-drift gate
+  cannot be run.* `(provenance :template-commit)` and `(variant :parent-pin)`
+  both name `3100d46b9cfee83317018f1e8244b2fafa9da660`, and
+  `:template-branch` names `init/repo-init`. Neither exists in
+  `hyperpolymath/rsr-template-repo`: the commit returns HTTP 422 from the
+  commits API and is reachable from no branch, and the branch is gone (the
+  parent carries only `main` and two work branches, `main` last pushed
+  2026-10-27). `scripts/check-variant-drift.sh` takes a parent checkout at
+  that pin as its argument, so the gate is *unrunnable*, not failing. Run
+  against the parent's current `main` instead it reports 137 lines of drift,
+  which measures fourteen days of parent evolution since the 2026-10-13 mint
+  mixed with this repo's real divergence, and is not actionable either way.
+  Re-pointing the pin at today's parent tip and rewriting the path lists to
+  make the gate green would certify convergence that has not been
+  demonstrated, so it is left for the estate owner: either re-publish the pin
+  or re-derive the contract deliberately. `check-template-conformance.sh` T3
+  asserts the same unfetchable commit and inherits the problem.
+* *Zig 0.17.0 `std.http.Client` + CONNECT proxy sends HTTPS requests in cleartext*
+  (`docs/developer/ZIG-STD-SURVEY.adoc`). Worth an upstream report.
+* *RFC 8080 §6*: the example signatures carry Labels=3 for a two-label owner, which a
+  validator must reject (`tests/vectors.zig`).
+* `drill -S` reported success for the DNSKEY RRset of a zone whose signatures had
+  expired a month earlier. Not investigated further; noted for whoever reviews ldns.
+
+== Estate note: what is proved, and where the next proof would go
+
+The guarantee "answer data is only reachable with secure evidence or a proven-insecure
+reason" is the kind of invariant the estate's epistemic-types work is meant to state: a
+`secure` answer as knowledge, `insecure` as justified absence of authentication, and no
+path from `bogus` to an answer. It is now stated as a type at the ABI seam
+(`src/interface/Abi/`): an Idris2 caller cannot receive answer data with a bogus or
+indeterminate verdict, even if the library wrote answer text for one (the FFI
+marshalling and the library's memory safety are assumed). Inside the library the same
+guarantee rests on the shape of a Zig tagged union and on tests. The next step towards
+PROVEN is a model of the validator's decision procedure (the chain walk and the denial
+proofs) in which "secure" can only be built from verified signatures up to an anchor;
+that is a larger piece of work and is not started.

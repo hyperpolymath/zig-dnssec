@@ -130,10 +130,9 @@ clean-all: clean
 # TEST & QUALITY
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Run every detected language's tests: `zig build test` covers src/interface/ffi
-# (unit tests in src/main.zig, test/integration_test.zig). It compiles only after
-# `just repo-init` has filled the template tokens, so an un-initialised template
-# fails here loudly instead of reporting a pass over nothing.
+# Run every detected language's tests: `zig build test` (library, C ABI and the
+# Idris2/header consistency checks in src/interface/ffi/test/) and
+# `idris2 --typecheck src/interface/abi.ipkg` (the seam's proofs).
 test: provision::test
 
 # Run tests with verbose output
@@ -145,8 +144,14 @@ test-smoke:
     @echo "FAIL: 'just test-smoke' is not wired yet — no smoke check ran. Edit the 'test-smoke' recipe." >&2; exit 1
 
 # Run end-to-end tests (full pipeline: build → run → verify)
-e2e:
+e2e: abi-e2e
     bash tests/e2e.sh
+
+# Idris2 -> C ABI -> Zig validator, over the recorded fixtures. Needs zig and idris2.
+abi-e2e:
+    zig build ffi
+    idris2 --build src/interface/E2e/abi-e2e.ipkg
+    LD_LIBRARY_PATH=zig-out/lib src/interface/E2e/build/exec/abi-e2e tests/testdata/crosscheck.traces tests/testdata/crosscheck-root.anchor
 
 # Run aspect tests (cross-cutting concern validation)
 aspect:
@@ -163,20 +168,34 @@ bench: provision::bench
 
 # Run readiness tests (Component Readiness Grade: D/C/B)
 readiness:
-    # TODO: Replace with your readiness test command. Examples:
-    #   cargo test --test readiness -- --nocapture
-    @echo "FAIL: 'just readiness' is not wired yet — no readiness test ran. Edit the 'readiness' recipe." >&2; exit 1
+    # Deliberately unwired, and deliberately failing. This variant's Component
+    # Readiness Grade is X (Untested) in docs/status/READINESS.adoc, so there is
+    # no readiness evidence for a test run to attest to. CRG v2.0 Principle 4 is
+    # "grade as-is today, not aspirationally": pointing this recipe at the unit
+    # or replay suite would report a grade the evidence does not support, and
+    # `just test-all` would then claim "safe to merge" on the strength of it.
+    # Wire this when the D-grade gates (RSR-compliant + per-capability tests +
+    # a documented scope with a citing test matrix) are actually met.
+    @echo "FAIL: 'just readiness' is not wired — CRG is X (Untested)." >&2; \
+     echo "      See docs/status/READINESS.adoc for the gates this variant has not met." >&2; \
+     exit 1
 
 # Print the current CRG grade (reads from READINESS.md '**Current Grade:** X' line)
 crg-grade:
-    @grade=$$(grep -oP '(?<=\*\*Current Grade:\*\* )[A-FX]' READINESS.md 2>/dev/null | head -1); \
+    @# This variant keeps its readiness assessment at docs/status/READINESS.adoc,
+    @# not the template's READINESS.md; reading only the latter silently reported
+    @# the fallback grade for the wrong reason. AsciiDoc bold is `*Current Grade:*`,
+    @# Markdown bold is `**Current Grade:**`, so both spellings are matched.
+    @f="docs/status/READINESS.adoc"; [ -f "$$f" ] || f="READINESS.md"; \
+    grade=$$(grep -oP '\*+Current Grade:\*+\s*\K[A-FX]' "$$f" 2>/dev/null | head -1); \
     [ -z "$$grade" ] && grade="X"; \
     echo "$$grade"
 
 # Print a shields.io CRG badge for embedding in README files
 # Looks for '**Current Grade:** X' in READINESS.md; falls back to X
 crg-badge:
-    @grade=$$(grep -oP '(?<=\*\*Current Grade:\*\* )[A-FX]' READINESS.md 2>/dev/null | head -1); \
+    @f="docs/status/READINESS.adoc"; [ -f "$$f" ] || f="READINESS.md"; \
+    grade=$$(grep -oP '\*+Current Grade:\*+\s*\K[A-FX]' "$$f" 2>/dev/null | head -1); \
     [ -z "$$grade" ] && grade="X"; \
     case "$$grade" in \
       A) color="brightgreen" ;; \

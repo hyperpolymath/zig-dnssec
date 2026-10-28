@@ -1,197 +1,253 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= Threat Model
-// SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= zig-dnssec: threat model, known gaps and trust-anchor assumptions
+:toc:
 
-== Threat Model: zig-dnssec
+This document says what the validator defends against, what it assumes, and every
+gap known at the time of writing. It is written for a reviewer: if something here is
+wrong or missing, that is a finding.
 
-=== Document Info
+== Model
 
+The library is a *security-aware validating stub* (RFC 4033 §4.9.3, RFC 4035 §4.9). It
+sends each query with `RD=1`, `CD=1` and EDNS `DO=1` to an upstream recursive resolver
+and authenticates the answer itself. The DS and DNSKEY records needed for the chain of
+trust are fetched through the same transport and walked bottom-up, from the RRSIG
+signer to the closest configured trust anchor.
+
+The upstream resolver and the network path are *untrusted* for integrity: a resolver
+that lies, strips signatures, or substitutes records must produce `bogus`, never
+`secure`. They are trusted for *availability* only: a resolver that refuses to answer
+produces `indeterminate`. Confidentiality of queries is the job of the transport (DoH
+with TLS), not of DNSSEC.
+
+== Verdicts and the no-silent-downgrade rule
+
+[cols="1,3"]
 |===
-| Field | Value
+| Verdict | Meaning
 
-| Project | zig-dnssec
-| Version | 1.0
-| Last Reviewed | 2026-10-13
-| Author | Jonathan D.A. Jewell
-| Methodology | STRIDE
-|===
+| `secure`
+| Every RRset in the answer chain verified under keys that chain to a trust anchor; any
+  negative or wildcard claim is backed by an authenticated NSEC/NSEC3 proof.
 
+| `insecure`
+| An authenticated proof shows the data lies below a delegation without DS (NSEC/NSEC3
+  insecure-delegation proof, or an NSEC3 Opt-Out span), *or* the caller explicitly
+  chose a permissive policy (below). The verdict carries the reason and the zone.
 
-=== Scope
+| `bogus`
+| Anything that should have been secure and was not: bad or expired signatures,
+  missing keys or chain links, unsigned data in a provably signed zone, missing or
+  invalid denial proofs, exhausted budgets, policy refusals.
 
-==== In Scope
-
-- Application source code and build pipeline
-- CI/CD workflows (GitHub Actions)
-- Container images and runtime environment
-- Secrets and credential management
-- Dependencies (direct and transitive)
-- Deployment artifacts (binaries, containers, SBOM)
-
-==== Out of Scope
-
-- Physical security of hosting infrastructure
-- GitHub/GitLab platform-level vulnerabilities
-- End-user device security
-- Social engineering attacks against maintainers (handled by org policy)
-
-=== System Overview
-
-Brief description of zig-dnssec and its architecture.
-
-NOTE: See link:../STATE-VISUALIZER.adoc[STATE-VISUALIZER.adoc] for the full architecture diagram and completion dashboard.
-
-=== Assets
-
-|===
-| Asset | Classification | Owner | Notes
-
-| Source code | Internal | Maintainers | Public repos are still internal-integrity
-| Signing keys | Restricted | Release lead | Signing keys (e.g., Ed25519), GPG keys
-| CI/CD secrets | Restricted | Maintainers | GITHUB_TOKEN, deploy tokens, PATs
-| User/contributor data | Confidential | Org | Emails, contributor identity
-| Build artifacts | Internal | CI pipeline | Binaries, WASM bundles
-| Container images | Internal | CI pipeline | Chainguard-based, signed via image signing tool
-| SBOM / provenance | Public | CI pipeline | SLSA attestations
-| Dependencies | Public | Lockfile | Cargo.lock, .lock, gleam.toml
-| Infrastructure config | Confidential | Maintainers | Containerfiles, compose files, orchestration config
+| `indeterminate`
+| No trust anchor covers the name, a chain fetch failed, the upstream returned an error
+  RCODE, or the response was truncated.
 |===
 
+Insecurity is never inferred from absence. A response with signatures stripped, a DS
+RRset removed, or a denial without proof is `bogus` (or `indeterminate` if the proof
+could not be fetched), as the mutation tests in `tests/replay.zig` check.
 
-=== Trust Boundaries
+== Policies (and where they depart from the RFCs)
 
+[cols="2,1,3"]
 |===
-| Boundary | From (Lower Trust) | To (Higher Trust)
+| Situation | Default | Note
 
-| Pull request submission | External contributor | Repository codebase
-| CI/CD workflow execution | Workflow definition | Runner with secrets access
-| Container build boundary | Build stage | Runtime stage
-| External API calls | Third-party service | Application internals
-| User input (CLI/Web) | End user | Application logic
-| Dependency resolution | Package registry | Build environment
-| Forge mirroring | GitHub | GitLab / Bitbucket
-|===
+| DS RRset (or anchor) holds only algorithms or digests this library cannot use
+| `bogus` (`unsupported_algorithm`)
+| RFC 4035 §5.2 / RFC 6840 §5.2 say *insecure*. The default refuses, so that a gap in
+  this implementation (e.g. Ed448) never turns into an unauthenticated answer.
+  `Policy.unsupported_algorithm = .insecure` gives the RFC behaviour, reported with
+  reason `unsupported_algorithm_policy`.
 
+| NSEC3 iterations above 150
+| `bogus` (`nsec3_iterations_exceeded`)
+| RFC 9276 §3.2 permits insecure or SERVFAIL; §4 asks that the two thresholds coincide.
+  Unbound 1.19 returns insecure. `Policy.nsec3_iterations = .insecure` matches Unbound.
 
-=== Threat Actors
+| RSASHA1 / RSASHA1-NSEC3-SHA1 signatures, SHA-1 DS digests
+| accepted
+| Implementing them is still a MUST (RFC 9904/9905 registry columns). RFC 9905 tells
+  operators to treat them as unsupported: set `Policy.allow_sha1 = false`. Combined with
+  the default unsupported-algorithm policy this yields `bogus`, not `insecure`.
 
-|===
-| Actor | Motivation | Capability
+| SHA-1 DS alongside SHA-256/384 DS
+| SHA-1 ignored
+| RFC 4509 §3.
 
-| Script kiddie | Vandalism, clout | Low
-| Disgruntled contributor | Sabotage, backdoor insertion | Medium
-| Supply chain attacker | Wide-impact compromise | High
-| Nation state | Espionage, disruption | Very High
-| Automated bot | Credential stuffing, spam PRs | Low-Medium
-|===
-
-
-=== STRIDE Analysis
-
-==== Spoofing
-
-|===
-| Threat | Affected Asset | Likelihood | Impact | Risk | Mitigation
-
-| Unsigned commits impersonate maintainer | Source code | Medium | High | High | Require GPG-signed commits; vigilant code review
-| Forged bot actions (automated agents) | CI/CD pipeline | Low | High | Medium | Bot tokens scoped minimally; audit bot activity
-| Spoofed package registry identity | Dependencies | Low | High | Medium | Pin dependencies by hash; verify provenance
+| RRSIG validity window
+| strict (no skew)
+| `Policy.clock_skew` widens it symmetrically. Unbound allows a skew of 10% of the
+  validity period, bounded to 1 h–1 d, so verdicts can differ near window edges.
 |===
 
+== Resource limits
 
-==== Tampering
+Each validation is bounded (all configurable in `Policy`): 64 fetches, 512 signature
+verifications in total and 8 failed verifications per RRset (a defence against
+KeyTrap-style key-tag collisions, CVE-2023-50387), 128 NSEC3 hash computations per proof
+(CVE-2023-50868 class), a 12-step CNAME/DNAME chain, and NSEC3 iterations ≤ 150.
+Exhausting a budget yields `bogus` with reason `resource_limit`. Message size is capped at
+65 535 octets; decoding allocates at most proportionally to the message.
 
-|===
-| Threat | Affected Asset | Likelihood | Impact | Risk | Mitigation
+== Known gaps
 
-| Malicious pull request | Source code | Medium | High | High | Branch protection; required reviews; CodeQL
-| Dependency poisoning (typosquat) | Dependencies | Medium | High | High | Lockfiles; secret-scanner; security scans
-| Tampered container base image | Container images | Low | High | Medium | Chainguard images; image signing verification
-| Workflow file modification | CI/CD pipeline | Low | High | Medium | CODEOWNERS on .github/; workflow-linter
-|===
+Every item here is a known limitation, not a hidden one.
 
+=== Cryptography
 
-==== Repudiation
+* *Ed448 (algorithm 16)* — Zig 0.17.0's standard library has no Ed448/Curve448. Zones
+  signed only with Ed448 are `bogus` by default (`insecure` with the permissive policy);
+  Unbound validates them. No binding was added: the brief excluded writing primitives,
+  and the estate's pure-Zig FFI rule rules out an OpenSSL binding.
+* *GOST (12, 23), SM2SM3 (17)* and GOST/SM3 DS digests — not implemented.
+* *RSA* — keys from 512 to 4096 bits (1024–4096 for RSASHA512) with public exponents of
+  at most 32 bits, a limit inherited from `std.crypto.Certificate.rsa`. RFC 3110 allows
+  longer exponents; none are known in use. The verifier is instantiated for every
+  modulus length in whole octets, which makes ReleaseSafe builds slow (about 80 s).
+* The RSA verifier is the one std uses for TLS certificate checking
+  (`std.crypto.Certificate.rsa.PKCS1v1_5Signature`). It recomputes and compares the
+  encoded message rather than parsing it, which avoids the classic PKCS#1 v1.5
+  signature-forgery parsing bugs. Its comparison is not constant time; for signature
+  *verification* of public data that is not a leak.
+* Ed25519 uses `verifyStrict` (cofactorless), as OpenSSL does; signatures that only pass
+  cofactored verification are rejected.
 
-|===
-| Threat | Affected Asset | Likelihood | Impact | Risk | Mitigation
+=== Protocol coverage
 
-| Unlogged deployment | Build artifacts | Medium | Medium | Medium | SLSA provenance; deployment audit trail
-| Denied merge of vulnerable code | Source code | Low | Medium | Low | Git history is immutable; signed commits
-| Secret rotation without record | CI/CD secrets | Low | Low | Low | Secret rotation logged in `docs/status/ROADMAP.adoc` (Maintenance runs)
-|===
+* *DNS-over-QUIC* — not implemented: Zig's standard library has no QUIC, and building
+  QUIC plus its TLS integration is a project of its own. The `Transport` interface takes
+  a DoQ implementation without changes elsewhere.
+* *HTTP/2* — the DoH transport speaks HTTP/1.1 only, so HTTP/2-only servers (Unbound's
+  own DoH listener, for one) cannot be used directly. Public resolvers tested
+  (Cloudflare) accept HTTP/1.1.
+* *Oblivious DoH (RFC 9230)* — not implemented (needs HPKE, which std lacks).
+* *Bootstrap* — the DoH server's host name is resolved by the system resolver; use an IP
+  literal in the URL, or a trusted bootstrap, if that matters.
+* *QTYPE ANY* and meta-types — refused (`bogus`, `malformed_response`).
+* *No cache*, so no aggressive NSEC use (RFC 8198), no negative caching, and each
+  validation refetches its chain.
+* *No Extended DNS Errors (RFC 8914)* — reasons are reported through `Reason` instead.
+* *A6, NAPTR and other rarely used types* are carried opaquely or with the layout in
+  `src/wire/rdata.zig`; A6 names are not lowercased for canonical form.
+* *Proxy authentication* is not supported for the CONNECT proxy.
 
+=== Behaviour that differs from a full resolver
 
-==== Information Disclosure
+* Zone cuts are discovered from RRSIG signer names and from DS queries sent through the
+  upstream resolver, not from referrals. A child-side (apex) NSEC/NSEC3 is not accepted
+  as proof that a DS does not exist: the DS lives in the parent (this is why RFC 4035
+  Appendix B.8 and RFC 5155 Appendix B.6, which show child-side answers, are rejected in
+  `tests/denial.zig`).
+* NSEC type bitmaps with windows out of order or with lengths outside 1–32 are rejected
+  as malformed; trailing zero octets are tolerated.
+* A response must answer exactly the question asked, with `QR=1` and opcode QUERY.
 
-|===
-| Threat | Affected Asset | Likelihood | Impact | Risk | Mitigation
+== The C ABI (`src/interface/`)
 
-| Secrets leaked in git history | CI/CD secrets | Medium | High | High | TruffleHog in CI; secret-scanner workflow
-| Verbose error messages in prod | Application logic | Medium | Medium | Medium | Sanitize outputs; structured logging
-| SBOM reveals internal structure | Infrastructure | Low | Low | Low | Accepted risk; SBOM is intentionally public
-|===
+* *What C callers are trusted for* — what any C API trusts: NUL-terminated strings, a
+  verdict pointer to a whole `zig_dnssec_verdict`, and `text_cap` writable bytes at
+  `text`. Breaking that is undefined behaviour. The library itself checks NULL
+  pointers, unknown policy bits, meta-type and zero query types, and malformed names,
+  anchors and traces, and reports each as a status with `security` NONE.
+* *The transport callback is untrusted* — its responses go through the same strict
+  parser and validation as DoH responses, and a reported length beyond the buffer is a
+  failed exchange. A failure of the first query is `ZIG_DNSSEC_ERR_QUERY_FAILED`; a
+  failure of a later DS or DNSKEY fetch is a verdict (`bogus` or `indeterminate`).
+* *The caller supplies the time* — the library never reads the clock, so a wrong `now`
+  gives wrong signature-validity decisions.
+* No global state; each call allocates with Zig's thread-safe general-purpose allocator
+  and frees everything before it returns. The shared object exports the six header
+  functions and nothing else, and links no libc.
+* The Idris2 wrapper reads the verdict struct little-endian and is tested on x86_64
+  Linux only.
 
+== Trust-anchor handling assumptions
 
-==== Denial of Service
+* Anchors are *static configuration*: DS and/or DNSKEY records in presentation format
+  (`TrustAnchors.fromText`) or the built-in IANA root DS records (`TrustAnchors.ianaRoot`).
+* The built-in anchors are the root KSK-2017 (tag 20326) and KSK-2024 (tag 38696) DS
+  records. They were checked on 2026-10-13 against
+  `https://data.iana.org/root-anchors/root-anchors.xml` (its S/MIME signature verified
+  with the ICANN Root CA bundle) and against Ubuntu's `dns-root-data` package. Both
+  sources agree. On that date a live query validated the root DNSKEY RRset from these
+  anchors.
+* There is *no RFC 5011 automated rollover*, no persistence, and no revocation tracking.
+  When the root rolls its KSK, or when KSK-2017 is revoked, the anchor text must be
+  updated by whoever ships the software. An out-of-date anchor fails closed (`bogus`),
+  it does not fail open.
+* No negative trust anchors (RFC 7646).
+* The closest anchor at or above a name is used; an anchor below the root ("island of
+  security") is honoured. A name with no anchor above it is `indeterminate`.
+* Whoever controls the anchor text controls what is `secure`. Treat it like code.
+* Revoked keys (RFC 5011 REVOKE bit) are never used to verify anything.
 
-|===
-| Threat | Affected Asset | Likelihood | Impact | Risk | Mitigation
+== Findings made along the way
 
-| CI resource exhaustion (fork bomb in PR) | CI/CD pipeline | Medium | Medium | Medium | Concurrency limits; timeout on workflows
-| Spam issues/PRs flooding triage | Maintainer time | Medium | Low | Low | GitHub rate limits; bot auto-close stale
-| Large binary commits bloating repo | Source code | Low | Medium | Low | .gitattributes LFS policy; pre-commit hooks
-|===
+* *Zig 0.17.0 `std.http.Client` sends HTTPS requests in cleartext through a CONNECT
+  proxy.* After a successful CONNECT it reuses the plain connection without starting TLS.
+  Observed with a local CONNECT proxy that logged `GET /dns-query HTTP/1.1` as the first
+  tunnelled bytes. That is why the DoH transport is built on `std.crypto.tls.Client`
+  directly. This should be reported upstream.
+* *RFC 8080 §6 examples.* The published RRSIG lines omit the Algorithm field. Re-signing
+  with the published private key reproduces the signatures byte for byte only when the
+  Labels field is 3, but the owner `example.com.` has two labels, which RFC 4035 §5.3.1
+  requires a validator to reject. `tests/vectors.zig` checks both facts.
 
+== What the milestone-1 review found
 
-==== Elevation of Privilege
+The milestone-1 pull request was reviewed twice by an automated reviewer over
+the wire codec, the validator, the DoH transport and the container build. All
+twelve findings are fixed, and each has a regression test that was confirmed
+to fail against the code it now guards (`zig build test`: 123 tests). They are
+recorded here because two of them are the shape of bug this threat model
+exists to rule out, and the model did not rule it out.
 
-|===
-| Threat | Affected Asset | Likelihood | Impact | Risk | Mitigation
+* *Insecurity inferred from an unauthenticated name.* The validator decided
+  that a zone was insecure from the `Signer` field of an RRSIG it had not
+  verified — on the answer path and, separately, on the denial path, where it
+  returned `insecure` before checking a single signature over the NSEC/NSEC3
+  and SOA records that were supposed to prove it. `Signer` is attacker-chosen:
+  it is only meaningful once a signature over it verifies. Combined with the
+  absence of a closest-anchor check, this let a responder inside a configured
+  secure island hand back a tampered answer as usable `insecure` data, which
+  is precisely the silent downgrade that the no-silent-downgrade rule above forbids. Both paths now
+  authenticate first, gather every candidate signer deepest-first, and refuse
+  a signer that is at or above a configured anchor.
+* *Unsigned fields treated as evidence.* Three findings were the same error in
+  different fields: the minimum `Labels` over all RRSIGs present rather than
+  the one that verified (a forged sibling could move the wildcard proof
+  depth); the first DS signature's signer rather than any that authenticates
+  (an extra RRSIG could break a valid chain); and the received TTL of unsigned
+  data as the answer's cache lifetime, which let an `insecure` answer outlive
+  the denial proof that made it acceptable. `TTL` and `Labels` are not covered
+  by an RRSIG over the data; only the RRSIG's own `Original TTL` and `Labels`
+  are, and only once that signature verifies.
 
-| Workflow injection via PR title/body | CI/CD pipeline | Medium | High | High | Never interpolate PR fields in `run:`; use env vars
-| GITHUB_TOKEN over-scoped | CI/CD secrets | Medium | High | High | `permissions: read-all` default; per-job scoping
-| Container escape | Runtime environment | Low | High | Medium | Hardened container runtime; read-only rootfs; no-new-privileges
-| Compromised action dependency | CI/CD pipeline | Medium | High | High | SHA-pin all actions; never use `@latest` tags
-|===
+The remaining findings were correctness and robustness rather than
+downgrades: `QTYPE=RRSIG` misreported as `bogus`, `QTYPE=CNAME` below a DNAME
+redirected past the synthesised answer (RFC 6672 §5.3.1), `effectiveTtl`
+wrapping for skew-accepted signatures, a missing SVCB/HTTPS RDATA layout so
+the TargetName was hashed in its received case, a `u8` overflow when a
+relative name is joined to its `$ORIGIN`, a dropped query component in a DoH
+URI template (RFC 8484 §3.1), and a container `CMD` whose `;`-chained teardown
+masked the cross-check's exit status.
 
+Two limits on this evidence are worth stating. The tests use the recorded
+cross-check fixtures, so they cover the zones and responses in
+`tests/testdata/crosscheck.traces` and synthetic mutations of them; they are
+not a substitute for the independent review recommended below. And the
+negative controls were run by reverting `src/dnssec/validator.zig` and
+`src/dnssec/rrset.zig` to their pre-fix state: seven replay tests failed as
+predicted and the positive control still passed, which is the only reason to
+believe the new tests test anything.
 
-=== Mitigations in Place
+== Review recommendation
 
-- **SLSA Provenance**: Build attestations via slsa-github-generator
-- **Secret Scanning**: TruffleHog + secret-scanner workflow on every push
-- **Static Analysis**: CodeQL on supported languages
-- **Supply Chain**: OpenSSF Scorecard (scorecard.yml + scorecard-enforcer.yml)
-- **Container Signing**: Ed25519 signatures on all published images (optional: use your signing tool)
-- **Container Runtime**: Hardened container runtime with formal verification (optional)
-- **Dependency Pinning**: All GitHub Actions SHA-pinned; lockfiles committed
-- **Workflow Validation**: workflow-linter.yml checks all workflow changes
-- **Security Scanning**: Neurosymbolic scanning (hypatia-scan.yml, optional)
-- **Bot Governance**: Bot orchestration with confidence thresholds (optional)
-- **Edge Security**: Gateway with policy enforcement (optional, where applicable)
-- **SBOM**: Generated and published with releases
-
-=== Residual Risks
-
-|===
-| Risk | Accepted Because | Review Trigger
-
-| Zero-day in GitHub Actions runner | Platform responsibility; no feasible mitigation | GitHub advisory
-| Maintainer account compromise | Mitigated by 2FA requirement; residual remains | Any suspicious activity
-| Transitive dependency vulnerability (0-day) | Lockfiles limit blast radius; scanning catches known CVEs | CVE database update
-| SBOM exposes internal component names | Transparency is a design goal | Policy change
-|===
-
-
-=== Review Schedule
-
-This threat model should be reviewed:
-
-- **Quarterly** as a standing item
-- **When architecture changes** (new services, new trust boundaries, new deployment targets)
-- **Before major releases** (v1.0, v2.0, etc.)
-- **After any security incident** affecting this project or its dependencies
-
-Reviewer should update the "Last Reviewed" date and version in Document Info above.
+Before anyone relies on this validator it should be reviewed independently, with
+particular attention to `src/dnssec/validator.zig` (insecurity proofs, zone-cut handling),
+`src/dnssec/nsec.zig` and `src/dnssec/nsec3.zig` (proof logic), `src/wire/message.zig` and
+`src/wire/name.zig` (parsing), and `src/stub/doh.zig` (TLS and HTTP handling).

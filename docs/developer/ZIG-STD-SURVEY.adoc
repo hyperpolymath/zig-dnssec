@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= Zig 0.17.0 standard library: what DNSSEC needs and what is there
+:toc:
+
+Surveyed against the installed toolchain, Zig 0.17.0 (released 2026-10-01; tarball
+checked against the published SHA-256 and minisign signature). Everything below was
+read from `lib/std` of that release and exercised by the tests.
+
+== Signature algorithms
+
+[cols="1,2,3,2",options="header"]
+|===
+| No. | DNSSEC algorithm | std 0.17.0 | Used here
+
+| 5, 7 | RSASHA1, RSASHA1-NSEC3-SHA1
+| `std.crypto.Certificate.rsa.PKCS1v1_5Signature.concatVerify(modulus_len, …, Sha1)`
+| yes
+
+| 8 | RSASHA256 | same, `sha2.Sha256` | yes
+| 10 | RSASHA512 | same, `sha2.Sha512` | yes
+| 13 | ECDSAP256SHA256 | `std.crypto.sign.ecdsa.EcdsaP256Sha256` (Verifier with `update`) | yes
+| 14 | ECDSAP384SHA384 | `std.crypto.sign.ecdsa.EcdsaP384Sha384` | yes
+| 15 | ED25519 | `std.crypto.sign.Ed25519` (`verify` cofactored, `verifyStrict` cofactorless) | yes, `verifyStrict`
+| 16 | ED448 | *absent* (no Edwards448/Curve448 in `std.crypto.ecc`) | no — documented gap
+| 12, 23 | ECC-GOST, ECC-GOST12 | absent | no
+| 17 | SM2SM3 | absent | no
+|===
+
+Notes on the RSA verifier:
+
+* It lives in `std.crypto.Certificate`, i.e. it is the TLS certificate path, and is
+  public API (`pub const rsa`).
+* `modulus_len` is a comptime parameter. This library instantiates it for every
+  modulus length in whole octets from the algorithm's minimum (64 octets, or 128 for
+  RSASHA512) to 512 octets. That covers every size RFC 3110 allows, at the cost of
+  roughly 80 s extra compile time in ReleaseSafe.
+* `PublicKey.fromBytes` rejects moduli under 512 bits and exponents that are even, below
+  3, or longer than 4 octets.
+* Verification re-encodes EMSA-PKCS1-v1_5 and compares; it does not parse the decrypted
+  block.
+
+== Hashes
+
+`std.crypto.hash.Sha1`, `sha2.Sha256`, `sha2.Sha384`, `sha2.Sha512`: all present. Used for
+DS digests (SHA-1/256/384), NSEC3 hashing (SHA-1) and the signature algorithms above.
+GOST R 34.11 and SM3 are absent.
+
+== Networking and TLS
+
+* `std.crypto.tls.Client`: TLS 1.2 and 1.3 client with certificate-chain and host-name
+  verification against a `std.crypto.Certificate.Bundle`. Used directly by the DoH
+  transport.
+* `std.http.Client`: HTTP/1.1 only. *Defect found:* with an `http://` proxy configured,
+  `connectProxied` returns the plain proxy connection after `CONNECT` and never starts
+  TLS, so an `https://` request goes through the tunnel in cleartext. Reproduced with a
+  minimal CONNECT proxy that logged `GET /dns-query HTTP/1.1` as the first tunnelled
+  bytes. The DoH transport therefore does not use `std.http.Client`; it uses
+  `std.http.Reader` and `std.http.Client.Response.Head.parse` for the response only.
+* No QUIC and no HTTP/2: DNS-over-QUIC (RFC 9250) and HTTP/2 DoH are not implementable
+  from std alone.
+* No HPKE: Oblivious DoH (RFC 9230) is not implementable from std alone.
+
+== Language and library changes met on the way (0.15 → 0.17)
+
+* The `**` array-repetition operator is gone; use `@splat` or a comptime helper.
+* `@typeInfo(T).@"enum".fields` is replaced by `field_names` / `field_values`; use
+  `std.enums.tagName` and `std.meta.stringToEnum`.
+* `std.mem.indexOf*` are now `find*` (the old names remain as aliases).
+* I/O goes through `std.Io` (readers, writers, net, clocks, randomness); `main` takes
+  `std.process.Init`.
+* `zig fmt` rewrites `@intFromEnum` to `@backingInt` where it applies.
+* Build: `b.args` is replaced by `Run.addPassthruArgs()`.
+* `std.testing.fuzz` takes a `std.testing.Smith`; `zig build test --fuzz=N` runs a
+  bounded coverage-guided campaign and saves crashing inputs under `.zig-cache/f/`.

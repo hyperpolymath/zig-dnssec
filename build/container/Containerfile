@@ -1,152 +1,79 @@
 # SPDX-License-Identifier: MPL-2.0
-# zig-dnssec Container Image
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 #
-# Multi-stage build template for Chainguard Wolfi base images.
-# Customise the builder stage for your language and copy the
-# resulting binary/release into the minimal runtime stage.
+# zig-dnssec container image (OCI; podman recommended, any engine works).
 #
-# This is the Tier-A artifact: a plain OCI image, buildable by ANY
-# OCI-compliant engine — podman (recommended), nerdctl, or docker.
-# It carries no hard dependency on the stapeln tier; the cerro-torre /
-# svalinn files under build/container/stapeln/ are referenced only as labels.
+# Targets:
+#   test        build + run the unit/vector/replay tests (default)
+#   crosscheck  test + NSD, Unbound, ldns, haproxy for tests/crosscheck/
+#   runtime     the dnssec-stub CLI alone on a minimal base
 #
-# Build (engine-agnostic — substitute podman | nerdctl | docker):
-#   podman build -t zig-dnssec:latest -f build/container/Containerfile .
+#   podman build -f build/container/Containerfile --target test -t zig-dnssec:test .
+#   podman build -f build/container/Containerfile --target runtime -t zig-dnssec:latest .
+#   podman run --rm zig-dnssec:latest --doh https://dns.quad9.net/dns-query example.com. A
 #
-# Run:
-#   podman run -p 8080:8080 zig-dnssec:latest
+# Behind a TLS-intercepting proxy, pass its CA for the build steps only (it is
+# not written into any image layer):
+#   podman build --secret id=extra-ca,src=/path/to/ca.pem ...
 #
-# Run with persistent volume:
-#   podman run -p 8080:8080 -v zig-dnssec-data:/data zig-dnssec:latest
-#
-# Via the Justfile (auto-detects engine, prefers cerro-torre when present):
-#   just container-build
+# The Zig toolchain is fetched from ziglang.org and checked against the
+# SHA-256 published in https://ziglang.org/download/index.json (the same
+# values pinned in mise.lock).
 
-# ============================================================================
-# Stage 1: Builder
-# ============================================================================
-#
-# Install build tools and compile the application.
-# This stage is discarded after the build — only the compiled output
-# is copied into the runtime stage.
-#
-# Language-specific examples (uncomment the one you need):
-#
-# --- Rust ---
-#   RUN apk add --no-cache rust pkgconf build-base
-#   COPY Cargo.toml Cargo.lock ./
-#   COPY src/ ./src/
-#   RUN cargo build --release
-#   # Output: /build/target/release/zig-dnssec
-#
-# --- Elixir ---
-#   RUN apk add --no-cache erl27-elixir-1.18 erlang-27 erlang-27-dev git build-base
-#   COPY mix.exs mix.lock ./
-#   COPY lib/ ./lib/
-#   COPY config/ ./config/
-#   ENV MIX_ENV=prod
-#   RUN mix local.hex --force && mix local.rebar --force && \
-#       mix deps.get --only prod && mix compile && mix release
-#   # Output: /build/_build/prod/rel/zig-dnssec/
-#
-# --- Zig ---
-#   RUN apk add --no-cache zig build-base
-#   COPY build.zig build.zig.zon ./
-#   COPY src/ ./src/
-#   RUN zig build -Doptimize=ReleaseFast
-#   # Output: /build/zig-out/bin/zig-dnssec
-#
-# Base image: `:latest` is right for a template scaffold (Chainguard rebuilds
-# Wolfi daily). For PRODUCTION builds, pin by digest for reproducibility/supply-
-# chain integrity, e.g.:
-#   FROM cgr.dev/chainguard/wolfi-base:latest@sha256:<digest> AS builder
-# (cerro-torre's .ctp signing in build/container/stapeln/ records the resolved digest.)
-FROM cgr.dev/chainguard/wolfi-base:latest AS builder
+ARG ZIG_VERSION=0.17.0
+ARG ZIG_SHA256_X86_64=1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026
+ARG ZIG_SHA256_AARCH64=9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8
 
-# TODO: Install your language toolchain
-RUN apk add --no-cache build-base
+# ---------------------------------------------------------------------------
+FROM cgr.dev/chainguard/wolfi-base:latest AS toolchain
+ARG ZIG_VERSION
+ARG ZIG_SHA256_X86_64
+ARG ZIG_SHA256_AARCH64
+RUN --mount=type=secret,id=extra-ca,required=false \
+    set -eu; \
+    if [ -s /run/secrets/extra-ca ]; then \
+      cat /etc/ssl/certs/ca-certificates.crt /run/secrets/extra-ca > /tmp/ca.pem; \
+      export SSL_CERT_FILE=/tmp/ca.pem CURL_CA_BUNDLE=/tmp/ca.pem; \
+    fi; \
+    apk add --no-cache curl xz; \
+    arch="$(uname -m)"; \
+    case "$arch" in \
+      x86_64) sum="$ZIG_SHA256_X86_64" ;; \
+      aarch64) sum="$ZIG_SHA256_AARCH64" ;; \
+      *) echo "unsupported architecture $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL --proto '=https' --tlsv1.2 -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-${arch}-linux-${ZIG_VERSION}.tar.xz"; \
+    echo "${sum}  /tmp/zig.tar.xz" | sha256sum -c -; \
+    xz -dc /tmp/zig.tar.xz | tar -x -C /opt; \
+    mv "/opt/zig-${arch}-linux-${ZIG_VERSION}" /opt/zig; \
+    rm -f /tmp/zig.tar.xz /tmp/ca.pem
+ENV PATH="/opt/zig:${PATH}"
 
-WORKDIR /build
+# ---------------------------------------------------------------------------
+FROM toolchain AS test
+WORKDIR /src
+COPY build.zig build.zig.zon ./
+COPY src/ ./src/
+COPY tests/ ./tests/
+RUN zig build test --summary all && zig build -Doptimize=ReleaseSafe
 
-# TODO: Copy source files and build
-COPY . .
-# RUN <your-build-command>
+# ---------------------------------------------------------------------------
+FROM test AS crosscheck
+RUN --mount=type=secret,id=extra-ca,required=false \
+    set -eu; \
+    if [ -s /run/secrets/extra-ca ]; then \
+      cat /etc/ssl/certs/ca-certificates.crt /run/secrets/extra-ca > /tmp/ca.pem; \
+      export SSL_CERT_FILE=/tmp/ca.pem; \
+    fi; \
+    apk add --no-cache bash nsd unbound ldns-tools haproxy bind-tools openssl gawk; \
+    rm -f /tmp/ca.pem
+# The cross-check's own exit status, not the teardown's. `A && B; C` exits with
+# C, and `servers.sh stop` normally succeeds, so a failed setup or a failed
+# cross-check used to report success from this container.
+CMD ["bash", "-c", "rc=0; { tests/crosscheck/servers.sh start && tests/crosscheck/run.sh; } || rc=$?; tests/crosscheck/servers.sh stop; sc=$?; if [ \"$rc\" -eq 0 ]; then rc=$sc; fi; exit \"$rc\""]
 
-# ============================================================================
-# Stage 2: Runtime
-# ============================================================================
-#
-# Minimal production image. Only the compiled binary/release and runtime
-# dependencies are included. No compilers, no source code, no build tools.
-#
-FROM cgr.dev/chainguard/wolfi-base:latest
-
-# OCI image labels (compatible with cerro-torre .ctp bundle metadata)
-LABEL org.opencontainers.image.title="zig-dnssec" \
-      org.opencontainers.image.description="Experimental pure-Zig DNS wire-format codec, DNSSEC validator and DoH stub client." \
-      org.opencontainers.image.url="https://github.com/hyperpolymath/zig-dnssec" \
-      org.opencontainers.image.source="https://github.com/hyperpolymath/zig-dnssec" \
-      org.opencontainers.image.vendor="hyperpolymath" \
-      org.opencontainers.image.licenses="MPL-2.0" \
-      org.opencontainers.image.authors="Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>" \
-      dev.cerrotorre.manifest="build/container/stapeln/manifest.toml" \
-      dev.cerrotorre.gatekeeper="build/container/stapeln/.gatekeeper.yaml" \
-      dev.stapeln.compose="build/container/stapeln/compose.toml"
-
-# Install minimal runtime dependencies.
-# Adjust this list for your application:
-#   - ca-certificates: TLS root certificates
-#   - curl: health check probe
-#   - libstdc++: C++ standard library (if needed by native deps)
-#   - ncurses: terminal UI (if needed, e.g. Elixir IEx)
-RUN apk add --no-cache ca-certificates curl
-
-# Create non-root user for the application.
-# Running as root inside containers is a security anti-pattern.
-RUN addgroup -S appuser && adduser -S appuser -G appuser
-
-WORKDIR /app
-
-# TODO: Copy compiled binary/release from builder stage.
-# Examples:
-#   COPY --from=builder /build/target/release/zig-dnssec /app/zig-dnssec
-#   COPY --from=builder /build/_build/prod/rel/zig-dnssec /app/release/
-#   COPY --from=builder /build/zig-out/bin/zig-dnssec /app/zig-dnssec
-
-# Copy entrypoint script
-COPY build/container/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
-# OPTIONAL (Tier C — stapeln). A pure OCI image does NOT need these baked in:
-# svalinn reads .gatekeeper.yaml from a mounted volume (see stapeln/compose.toml),
-# and cerro-torre reads manifest.toml at pack time. Uncomment only if you want
-# the policy/manifest embedded in the image itself.
-# COPY build/container/stapeln/.gatekeeper.yaml /etc/svalinn/gatekeeper.yaml
-# COPY build/container/stapeln/manifest.toml /app/manifest.toml
-
-# Create data directory for persistent storage (mountable volume)
-RUN mkdir -p /data && chown appuser:appuser /data
-
-# Set ownership of the application directory
-RUN chown -R appuser:appuser /app
-
-# Environment variables — customise for your application
-ENV APP_HOST=[::]
-ENV APP_PORT=8080
-ENV APP_LOG_FORMAT=json
-ENV APP_DATA_DIR=/data
-
-# Declare /data as a volume for persistent storage
-VOLUME ["/data"]
-
-# Run as non-root
-USER appuser
-
-# Expose the application port
-EXPOSE 8080
-
-# Health check — the application must respond 2xx at /health
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -sf http://localhost:${APP_PORT}/health || exit 1
-
-ENTRYPOINT ["/app/entrypoint.sh"]
+# ---------------------------------------------------------------------------
+FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
+COPY --from=test /src/zig-out/bin/dnssec-stub /usr/local/bin/dnssec-stub
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/dnssec-stub"]

@@ -10,6 +10,116 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Added
 
+* DNS wire-format codec (RFC 1035): strict, bounds-checked decoding;
+  encoding with name compression; presentation-format parser.
+* DNSSEC signature verification through Zig's standard library: RSASHA1,
+  RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256, ECDSAP384SHA384,
+  ED25519; DS digests SHA-1, SHA-256, SHA-384.
+* NSEC and NSEC3 denial-of-existence proofs (RFC 4035, RFC 5155, RFC 6840).
+* Chain-of-trust validator with `secure | insecure | bogus | indeterminate`
+  verdicts, static trust anchors (IANA root KSK-2017 and KSK-2024 built in),
+  resource budgets, and fail-closed default policies.
+* Validating stub client over DNS-over-HTTPS (HTTP/1.1, TLS end to end,
+  optional CONNECT proxy) and the `dnssec-stub` command-line tool.
+* Tests: RFC known-answer vectors, RFC appendix zones and responses, 263
+  recorded responses replayed offline, mutation attacks, fuzz targets with a
+  corpus; a cross-check against Unbound and ldns (`tests/crosscheck/`).
+* `zig-ci` workflow; container image (`build/container/Containerfile`).
+* C ABI (`zig build ffi`): `zig_dnssec.h` as the contract, a pure-Zig
+  `libzig_dnssec` checked against it at compile time, and an Idris2 model of
+  the interface (`src/interface/Abi/`) whose result type cannot carry an
+  answer for a bogus or indeterminate verdict; tests keep the three in step,
+  and an Idris2 end-to-end test (`just abi-e2e`) runs in CI.
+
+==== Fixed
+
+* Integer overflow in name decoding at the 255-octet boundary (found by
+  fuzzing).
+* DNAME answers were rejected because the synthesised CNAME was examined
+  first (found by the Unbound cross-check).
+
+Twelve findings from the external review of the milestone-1 pull request
+(`hyperpolymath/zig-dnssec`#4, two automated reviews over `6d6a2b11` and
+`4025364b`). Each has a regression test that was confirmed to fail against
+the code it now guards; the two marked *security* accepted or produced
+attacker-influenced data.
+
+* *Security:* a forged RRSIG naming an insecure ancestor could bypass a
+  closer trust anchor. Insecurity was inferred from the RRSIG's signer name
+  alone, so an answer signed by a zone that is insecure from the root anchor
+  was handed back as usable `insecure` data even when an anchor existed below
+  that zone (RFC 4035 §5.2's closest-encloser rule). The signer is now
+  rejected when a configured anchor is at or below it, and the answer is
+  `bogus` (`bad_signer`).
+* *Security:* the same defect on the denial path. `collectDenial` chose the
+  zone from the first unauthenticated RRSIG signer and returned `insecure`
+  before any signature over the NSEC/NSEC3/SOA records was checked. All
+  candidate signers are now gathered deepest-first and the denial RRset is
+  authenticated before it can establish anything.
+* `computeZoneStatus` used only the first DS signature's signer; it now tries
+  every signer of the DS RRset that is a strict ancestor of the child.
+* An extra RRSIG over a DS RRset naming a different ancestor could break an
+  otherwise valid chain (`no_matching_key` against the wrong keyset).
+* A forged same-signer RRSIG with a smaller `Labels` field could change the
+  depth at which a wildcard expansion was proved, rejecting valid answers.
+  The `Labels` value now comes from the signature that actually verified, not
+  from the minimum over all signatures present.
+* An `insecure` answer could be cached for the TTL the responder chose: the
+  received TTL of unsigned data is not signed, and the answer outlived the
+  denial proof that made it acceptable. The proof's own TTL now bounds it.
+* `QTYPE=RRSIG` was reported as `bogus` for a correctly signed response;
+  nothing signs an RRSIG RRset, so it is now refused as `malformed_response`
+  at the validator and `ZIG_DNSSEC_ERR_INVALID_ARGUMENT` at the C ABI.
+* For `QTYPE=CNAME` below a DNAME, the synthesised CNAME *is* the answer
+  (RFC 6672 §5.3.1); the validator redirected past it and then demanded a
+  NODATA proof nobody is obliged to send.
+* `effectiveTtl` wrapped to a huge value for signatures accepted only within
+  the configured clock skew; it now measures to the widened window and fails
+  closed at 0.
+* The SVCB/HTTPS RDATA layout was missing, so the TargetName was hashed in
+  the case it arrived in rather than canonical lowercase (RFC 4034 §6.2,
+  RFC 9460 §2.2).
+* A relative name joined to its `$ORIGIN` overflowed the `u8` length before
+  the 255-octet check, panicking in safe modes and overrunning the name
+  buffer otherwise.
+* The DoH transport dropped the query component of a configured URI template,
+  silently requesting a different endpoint (RFC 8484 §3.1).
+* `build/container/Containerfile`: the `crosscheck` target's `CMD` chained
+  `servers.sh stop` with `;`, so its exit status masked the cross-check's.
+
+==== Changed
+
+* `scripts/validate-template.sh` now honours the repo deed's
+  `(paths :removed …)` list, and builds the root `build.zig` when the
+  variant contract has removed `src/interface/ffi/build.zig`. Previously it
+  required paths this variant deliberately deleted and, under `set -e`,
+  aborted on the first one without reporting the rest.
+* `zig-dnssec_chora.deed`: the `(variant (paths …))` clause closed with one
+  parenthesis too many, which ended `(repo-deed …)` early and left
+  `(provenance)` a sibling of it rather than a clause of it. No reader could
+  reach the provenance facts — `scripts/deed-field.sh --has … provenance`
+  reported the clause absent, so
+  `scripts/check-template-conformance.sh` failed T1 and never evaluated
+  T2–T4. This came from the mint, not from this milestone: `main` carries the
+  same defect, and `build/just/repo-init.just` emits the correct `)))`.
+* Toolchain pins: the Zig download in `zig-ci.yml` and in the container's
+  `toolchain` stage now forces HTTPS and a minimum of TLS 1.2
+  (`curl --proto '=https' --tlsv1.2`), so a pinned SHA-256 cannot be
+  satisfied by a downgraded transfer.
+* Toolchain pin: Zig 0.16.0 → 0.17.0 (`mise.lock`).
+* `src/interface/`: the template's example ABI/FFI seam is replaced by the
+  zig-dnssec C ABI; its separate `ffi/build.zig` is gone (the root
+  `build.zig` builds and tests the seam).
+
+=== Inherited from rsr-template-repo at mint (2026-10-13)
+
+The entries below describe the template this repository was minted from, not
+zig-dnssec itself.
+
+==== Template [Unreleased]
+
+==== Added
+
 * `www/` site-operations bundle (issue #53): canonical `.well-known/`
   metadata, publishable content, policy sources, error bodies,
   security-header templates, Caddy/nginx/Apache integration examples, an

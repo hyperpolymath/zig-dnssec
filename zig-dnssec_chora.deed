@@ -1055,7 +1055,7 @@
     ; (vocabulary 0.3.0) and checked with standards scripts/check-rsr-profile.sh.
     ; Each capability names a surface this tree carries; add one only with
     ; the module it gates.
-    :capabilities ("zig" "idris2" "bash" "library" "ffi" "abi" "container" "reproducible-build" "benchmarks" "governance-tier" "published-package" "formal-proofs"))
+    :capabilities ("zig" "idris2" "bash" "library" "cli" "ffi" "abi" "container" "reproducible-build" "benchmarks" "governance-tier" "published-package" "formal-proofs"))
   ; variant — provenance contract (ADR-0002 shape; ADR-0003 use).
   ; Records what this repo was minted from so the drift gate
   ; (scripts/check-variant-drift.sh <parent-checkout>) and future
@@ -1084,18 +1084,45 @@
     ; Files a minted repo owns from birth are (paths :diverged …).
     (paths
       :added (
+        ".github/workflows/zig-ci.yml"
+        "build.zig"
+        "build.zig.zon"
         "docs/architecture.adoc"
         "docs/contributing.adoc"
         "docs/decisions/0001-template.adoc"
+        "docs/developer/ZIG-STD-SURVEY.adoc"
+        "docs/reports/FUZZ-RESULTS.adoc"
+        "docs/reports/VERIFICATION.adoc"
         "docs/troubleshooting.adoc"
-        "docs/usage.adoc")
+        "docs/usage.adoc"
+        "src/cli/"
+        "src/dnssec/"
+        "src/interface/E2e/"
+        "src/interface/ffi/include/"
+        "src/interface/ffi/test/abi_test.zig"
+        "src/interface/ffi/test/seam_test.zig"
+        "src/root.zig"
+        "src/stub/"
+        "src/wire/"
+        "tests/crosscheck/"
+        "tests/denial.zig"
+        "tests/fuzz.zig"
+        "tests/fuzz/corpus/"
+        "tests/fuzz/dnssec-fuzz.zig"
+        "tests/fuzz_targets.zig"
+        "tests/fuzz_validator.zig"
+        "tests/replay.zig"
+        "tests/testdata/"
+        "tests/vectors.zig")
       :removed (
         ".github/workflows/rust-ci.yml"
         ".machine_readable/ai/PLACEHOLDERS.adoc"
         "archetypes/"
         "build/docs-seed/"
         "build/templates/"
-        "rsr-template-repo_chora.deed")
+        "rsr-template-repo_chora.deed"
+        "src/interface/ffi/build.zig"
+        "src/interface/ffi/test/integration_test.zig")
       :diverged (
         ".clinerules"
         ".cursorrules"
@@ -1119,6 +1146,7 @@
         ".github/workflows/release.yml"
         ".github/workflows/sonarqube.yml"
         ".github/workflows/static-analysis-gate.yml"
+        ".gitignore"
         ".machine_readable/coaptation/receipts/latest.toml"
         ".machine_readable/coaptation/witness-map.ncl"
         ".machine_readable/compliance/reuse/dep5"
@@ -1130,6 +1158,7 @@
         ".machine_readable/contractiles/dust/dust.k9.ncl"
         ".machine_readable/contractiles/intend/intend.k9.ncl"
         ".machine_readable/contractiles/must/must.k9.ncl"
+        ".machine_readable/root-allow.txt"
         ".machine_readable/scripts/maintenance/maint-assault.sh"
         ".machine_readable/self-validating/README.adoc"
         ".machine_readable/self-validating/examples/ci-config.k9.ncl"
@@ -1140,6 +1169,7 @@
         ".machine_readable/self-validating/template-kennel.k9.ncl"
         ".machine_readable/self-validating/template-yard.k9.ncl"
         ".windsurfrules"
+        "CHANGELOG.adoc"
         "CITATION.cff"
         "CLAUDE.md"
         "Justfile"
@@ -1159,6 +1189,7 @@
         "build/just/groove.just"
         "build/just/repo-init.just"
         "docs/AFFIRMATION.adoc"
+        "docs/AI_INSTALLATION_GUIDE.adoc"
         "docs/MAINTAINERS.adoc"
         "docs/QUICKSTART.adoc"
         "docs/architecture/REPOSITORY-MAP.adoc"
@@ -1179,12 +1210,24 @@
         "docs/status/READINESS.adoc"
         "docs/status/ROADMAP.adoc"
         "docs/status/TEST-NEEDS.adoc"
+        "mise.lock"
         "scripts/campaigns/www-bundle.campaign"
         "scripts/check-no-placeholders.sh"
+        "scripts/validate-template.sh"
+        "src/README.adoc"
+        "src/interface/Abi/Foreign.idr"
+        "src/interface/Abi/Layout.idr"
+        "src/interface/Abi/README.adoc"
+        "src/interface/Abi/Types.idr"
+        "src/interface/README.adoc"
+        "src/interface/ffi/README.adoc"
+        "src/interface/ffi/src/README.adoc"
         "src/interface/ffi/src/main.zig"
+        "src/interface/ffi/test/README.adoc"
         "tests/aspect_tests.sh"
         "tests/e2e.sh"
         "tests/e2e/template_instantiation_test.sh"
+        "tests/fuzz/README.adoc"
         "www/.well-known/aibdp.json"
         "www/.well-known/humans.txt"
         "www/.well-known/security.txt"
@@ -1193,7 +1236,7 @@
         "www/policies/ai-use.adoc"
         "www/policies/privacy.adoc"
         "www/public/index.html"
-        "zig-dnssec_chora.deed"))))
+        "zig-dnssec_chora.deed")))
   ; provenance — what this repo was minted FROM. Written once, at mint,
   ; by build/just/repo-init.just. Tools that want "what is this repo" read
   ; the rest of the deed; tools that want "where did it come from" read this.

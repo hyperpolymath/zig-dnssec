@@ -1,65 +1,34 @@
 -- SPDX-License-Identifier: MPL-2.0
--- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-||| ABI Layout Verification
+-- SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+||| Memory layout of `zig_dnssec_verdict` (src/interface/ffi/include/zig_dnssec.h),
+||| with proofs that every field is aligned, that the fields are in order and do
+||| not overlap, and that the struct size is a multiple of its alignment.
 |||
-||| This module provides formal proofs about memory layout, alignment,
-||| and padding for C-compatible structs.
+||| The offsets here are compared with the C compiler's (`@offsetOf` of the
+||| translated header) by `zig build test`, so this model and the real struct
+||| cannot drift silently. The model assumes natural alignment and 8-bit bytes,
+||| as on the 64-bit targets the library is built for; it is tested on x86_64
+||| Linux only.
 
 module Abi.Layout
 
-import Abi.Types
-import Data.Vect
+import Data.Fin
+import Data.Nat
 import Data.So
+import Data.Vect
 
 %default total
 
 --------------------------------------------------------------------------------
--- Alignment Invariants
+-- Layout model
 --------------------------------------------------------------------------------
 
-||| Predicate: n divides m
+||| n divides m
 public export
 data Divides : (n, m : Nat) -> Type where
   MkDivides : (k : Nat) -> (0 prf : m = k * n) -> Divides n m
 
-||| Implementation of divides for common sizes
-public export
-div8_24 : Divides 8 24
-div8_24 = MkDivides 3 Refl
-
-public export
-div4_0 : Divides 4 0
-div4_0 = MkDivides 0 Refl
-
-public export
-div8_8 : Divides 8 8
-div8_8 = MkDivides 1 Refl
-
-public export
-div8_16 : Divides 8 16
-div8_16 = MkDivides 2 Refl
-
-||| Calculate padding required for an offset to meet alignment
-public export
-paddingFor : (offset : Nat) -> (alignment : Nat) -> Nat
-paddingFor offset 0 = 0
-paddingFor offset alignment =
-  let m = offset `mod` alignment in
-  if m == 0
-    then 0
-    else alignment `minus` m
-
-||| Align a size up to the next multiple of alignment
-public export
-alignUp : (size : Nat) -> (alignment : Nat) -> Nat
-alignUp size alignment =
-  size + paddingFor size alignment
-
---------------------------------------------------------------------------------
--- Struct Model
---------------------------------------------------------------------------------
-
-||| Representation of a single field in a struct
+||| A field: name, byte offset, size and alignment.
 public export
 record Field where
   constructor MkField
@@ -68,61 +37,94 @@ record Field where
   size : Nat
   alignment : Nat
 
-||| Valid memory layout for a C struct
+||| Every field is aligned.
 public export
-record StructLayout where
-  constructor MkStructLayout
-  {n : Nat}
-  fields : Vect n Field
-  totalSize : Nat
-  alignment : Nat
-  {auto 0 aligned : Divides alignment totalSize}
-
---------------------------------------------------------------------------------
--- Compliance Predicates
---------------------------------------------------------------------------------
-
-||| Proof that all fields in a struct are correctly aligned
-public export
-data FieldsAligned : Vect n Field -> Type where
+data FieldsAligned : Vect k Field -> Type where
   NoFields : FieldsAligned []
   ConsField :
     (f : Field) ->
-    (rest : Vect n Field) ->
     (0 prf : Divides f.alignment f.offset) ->
     FieldsAligned rest ->
     FieldsAligned (f :: rest)
 
-||| Predicate: Struct is C-ABI compliant
+||| Fields start at or after `from`, appear in increasing order without
+||| overlapping, and the last one ends at or before `end`.
 public export
-data CABICompliant : StructLayout -> Type where
-  CABIOk : (l : StructLayout) ->
-           (0 prf : FieldsAligned l.fields) ->
-           CABICompliant l
+data InOrder : (from, end : Nat) -> Vect k Field -> Type where
+  Fits : (0 prf : So (lte from end)) -> InOrder from end []
+  Next :
+    (f : Field) ->
+    (0 prf : So (lte from f.offset)) ->
+    InOrder (f.offset + f.size) end rest ->
+    InOrder from end (f :: rest)
+
+||| A C-compatible struct layout.
+public export
+record StructLayout where
+  constructor MkStructLayout
+  {0 k : Nat}
+  fields : Vect k Field
+  totalSize : Nat
+  alignment : Nat
+
+||| What makes a layout valid: aligned fields, no overlap, size a multiple of
+||| the alignment.
+public export
+record CABICompliant (l : StructLayout) where
+  constructor CABIOk
+  0 aligned : FieldsAligned l.fields
+  0 ordered : InOrder 0 l.totalSize l.fields
+  0 padded : Divides l.alignment l.totalSize
 
 --------------------------------------------------------------------------------
--- Example and Proofs
+-- zig_dnssec_verdict
 --------------------------------------------------------------------------------
 
-||| Example: struct { int32_t x; int64_t y; double z; }
-||| On 64-bit Linux, this should have size 24, alignment 8.
+||| ZIG_DNSSEC_WHERE_MAX
 public export
-exampleLayout : StructLayout
-exampleLayout =
-  MkStructLayout
-    [ MkField "x" 0 4 4     -- Bits32 at offset 0
-    , MkField "y" 8 8 8     -- Bits64 at offset 8 (4 bytes padding)
-    , MkField "z" 16 8 8    -- Double at offset 16
-    ]
-    24  -- Total size: 24 bytes
-    8   -- Alignment: 8 bytes
-    {aligned = div8_24}
+whereMax : Nat
+whereMax = 1024
 
-||| Proof that example layout is valid
 public export
-exampleLayoutValid : CABICompliant Abi.Layout.exampleLayout
-exampleLayoutValid = CABIOk Abi.Layout.exampleLayout (
-  ConsField (MkField "x" 0 4 4) _ div4_0 (
-  ConsField (MkField "y" 8 8 8) _ div8_8 (
-  ConsField (MkField "z" 16 8 8) _ div8_16 (
-  NoFields))))
+verdictFields : Vect 10 Field
+verdictFields =
+  [ MkField "security"      0  1 1
+  , MkField "reason"        1  1 1
+  , MkField "reserved"      2  2 2
+  , MkField "rcode"         4  2 2
+  , MkField "rtype"         6  2 2
+  , MkField "ttl"           8  4 4
+  , MkField "fetches"       12 4 4
+  , MkField "verifications" 16 4 4
+  , MkField "text_len"      20 4 4
+  , MkField "where"         24 1024 1
+  ]
+
+public export
+verdictLayout : StructLayout
+verdictLayout = MkStructLayout verdictFields 1048 4
+
+export
+verdictLayoutValid : CABICompliant Abi.Layout.verdictLayout
+verdictLayoutValid = CABIOk
+  (ConsField _ (MkDivides 0 Refl)
+    (ConsField _ (MkDivides 1 Refl)
+      (ConsField _ (MkDivides 1 Refl)
+        (ConsField _ (MkDivides 2 Refl)
+          (ConsField _ (MkDivides 3 Refl)
+            (ConsField _ (MkDivides 2 Refl)
+              (ConsField _ (MkDivides 3 Refl)
+                (ConsField _ (MkDivides 4 Refl)
+                  (ConsField _ (MkDivides 5 Refl)
+                    (ConsField _ (MkDivides 24 Refl)
+                      NoFields))))))))))
+  (Next _ Oh (Next _ Oh (Next _ Oh (Next _ Oh (Next _ Oh
+    (Next _ Oh (Next _ Oh (Next _ Oh (Next _ Oh (Next _ Oh
+      (Fits Oh)))))))))))
+  (MkDivides 262 Refl)
+
+||| The offset of verdict field `i`, which must be called `n`: a reader that
+||| names the wrong field does not typecheck.
+public export
+offsetNamed : (i : Fin 10) -> (n : String) -> {auto 0 named : (index i Abi.Layout.verdictFields).name = n} -> Nat
+offsetNamed i _ = (index i verdictFields).offset
