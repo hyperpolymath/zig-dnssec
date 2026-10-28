@@ -135,10 +135,12 @@ validator's own logic is proved yet.
 
 | DNSKEY (as opposed to DS) trust anchors; anchors below the root
 | TESTED (island-anchor path only)
-| `anchoredKeys` in `validator.zig`, exercised end to end by three replay tests
+| The island-anchor validation path in `validator.zig`, including `anchoredKeys`
+  and the closer-anchor checks, exercised end to end by four replay tests
   added in the review cycle: one positive control asserting an anchored island
-  below an insecure delegation validates as `secure`, and two negatives asserting
-  a forged RRSIG signer and a forged SOA owner cannot reach over that anchor.
+  below an insecure delegation validates as `secure`, and three negatives
+  asserting a forged answer signer, a forged denial signer, and a forged SOA
+  owner cannot reach over that anchor.
   Anchors *above* an untrusted chain, and RFC 5011 rollover, remain untested
 
 | Correctness of Zig's `std.crypto` primitives and TLS client
