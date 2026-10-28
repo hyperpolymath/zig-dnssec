@@ -176,7 +176,15 @@ fn parseTtl(t: []const u8) Error!u32 {
             'w' => 604800,
             else => return error.BadNumber,
         };
-        total += acc * mult;
+        // Checked, and bailed on as soon as the sum cannot fit: every term is
+        // non-negative, so a partial sum past u32 can never come back. Plain
+        // u64 accumulation let a long-enough compound TTL such as repeated
+        // `4294967295w` overflow before the final range check - a panic in
+        // Debug and ReleaseSafe, and a wrapped, wrongly small TTL otherwise,
+        // from a public zone parser.
+        const term = std.math.mul(u64, acc, mult) catch return error.BadNumber;
+        total = std.math.add(u64, total, term) catch return error.BadNumber;
+        if (total > std.math.maxInt(u32)) return error.BadNumber;
         acc = 0;
         have_digit = false;
     }
@@ -231,11 +239,22 @@ pub fn parseRrsigTime(t: []const u8) Error!u32 {
     const h = std.fmt.parseInt(i64, t[8..10], 10) catch return error.BadTime;
     const mi = std.fmt.parseInt(i64, t[10..12], 10) catch return error.BadTime;
     const s = std.fmt.parseInt(i64, t[12..14], 10) catch return error.BadTime;
-    if (mo < 1 or mo > 12 or d < 1 or d > 31 or h > 23 or mi > 59 or s > 60) return error.BadTime;
+    if (mo < 1 or mo > 12 or d < 1 or h > 23 or mi > 59 or s > 60) return error.BadTime;
+    // `d <= 31` is not a calendar. daysFromCivil normalises rather than fails,
+    // so 20230231000000 used to be encoded as a March timestamp: a zone file or
+    // test vector stating an impossible RRSIG inception or expiration was
+    // silently recorded as a different instant than the text says.
+    const month_len = [_]i64{ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    const lim = if (mo == 2 and isLeapYear(y)) @as(i64, 29) else month_len[@intCast(mo - 1)];
+    if (d > lim) return error.BadTime;
     const days = daysFromCivil(y, mo, d);
     const secs = days * 86400 + h * 3600 + mi * 60 + s;
     if (secs < 0) return error.BadTime;
     return @truncate(@as(u64, @intCast(secs)));
+}
+
+fn isLeapYear(y: i64) bool {
+    return (@rem(y, 4) == 0 and @rem(y, 100) != 0) or @rem(y, 400) == 0;
 }
 
 /// Howard Hinnant's days_from_civil.
@@ -532,6 +551,14 @@ pub fn parseZone(gpa: std.mem.Allocator, text: []const u8, opts: Options, diag: 
 // Formatting (diagnostics only; not a complete presentation-format writer)
 // ---------------------------------------------------------------------------
 
+/// RFC 3597 §5 unknown-type form: `\# <length> <hex>`. Valid presentation
+/// format for any RDATA, used where the complete form does not fit a stack
+/// buffer.
+fn genericRdata(w: *std.Io.Writer, rd: []const u8) std.Io.Writer.Error!void {
+    try w.print("\\# {d}", .{rd.len});
+    for (rd) |b| try w.print(" {x:0>2}", .{b});
+}
+
 pub fn formatRr(w: *std.Io.Writer, rr: *const Rr) std.Io.Writer.Error!void {
     var tb: [16]u8 = undefined;
     try rr.name.format(w);
@@ -585,20 +612,45 @@ pub fn formatRr(w: *std.Io.Writer, rr: *const Rr) std.Io.Writer.Error!void {
             return w.print("{d} {d} {d} {x}", .{ d.key_tag, @backingInt(d.algorithm), @backingInt(d.digest_type), d.digest });
         } else |_| {},
         .dnskey => if (rdata_mod.Dnskey.parse(rd)) |k| {
-            return w.print("{d} {d} {d} ({d}-octet key)", .{ k.flags, k.protocol, @backingInt(k.algorithm), k.public_key.len });
+            // RFC 4034 §2.2 presentation form: the public key in base64. A
+            // "(256-octet key)" placeholder is not RDATA and cannot be parsed
+            // or reused, and both the CLI and the C ABI promise presentation
+            // format for answer records.
+            var kb: [1024]u8 = undefined;
+            const need = std.base64.standard.Encoder.calcSize(k.public_key.len);
+            // RFC 3597 generic form replaces the WHOLE RDATA, so this has to be
+            // decided before any of it is written: emitting the flags and then
+            // `\# <len>` would be neither presentation form nor generic form.
+            if (need > kb.len) return genericRdata(w, rd);
+            try w.print("{d} {d} {d} ", .{ k.flags, k.protocol, @backingInt(k.algorithm) });
+            return w.writeAll(std.base64.standard.Encoder.encode(&kb, k.public_key));
         } else |_| {},
         .rrsig => if (rdata_mod.Rrsig.parse(rd)) |s| {
             try w.print("{s} {d} {d} {d} {d} {d} {d} ", .{ s.type_covered.mnemonic(&tb), @backingInt(s.algorithm), s.labels, s.original_ttl, s.expiration, s.inception, s.key_tag });
             try s.signer.format(w);
             return w.writeAll(" (signature)");
         } else |_| {},
+        // NSEC and NSEC3 used to stand in for their type bitmaps with
+        // "(types)", which is likewise not parseable. The bitmap is small, so
+        // it is enumerated into a stack buffer and written as mnemonics.
         .nsec => if (rdata_mod.Nsec.parse(rd)) |n| {
             try n.next.format(w);
-            return w.writeAll(" (types)");
+            var tbuf: [128]Type = undefined;
+            for (n.types.fill(&tbuf)) |t| {
+                var mb: [16]u8 = undefined;
+                try w.print(" {s}", .{t.mnemonic(&mb)});
+            }
+            return;
         } else |_| {},
         .nsec3 => if (rdata_mod.Nsec3.parse(rd)) |n| {
             var b32: [512]u8 = undefined;
-            return w.print("{d} {d} {d} {x} {s} (types)", .{ @backingInt(n.hash_algorithm), n.flags, n.iterations, n.salt, encoding.base32HexEncode(&b32, n.next_hashed_owner) });
+            try w.print("{d} {d} {d} {x} {s}", .{ @backingInt(n.hash_algorithm), n.flags, n.iterations, n.salt, encoding.base32HexEncode(&b32, n.next_hashed_owner) });
+            var tbuf: [128]Type = undefined;
+            for (n.types.fill(&tbuf)) |t| {
+                var mb: [16]u8 = undefined;
+                try w.print(" {s}", .{t.mnemonic(&mb)});
+            }
+            return;
         } else |_| {},
         else => {},
     }
@@ -663,4 +715,130 @@ test "generic RDATA" {
     defer z.deinit();
     try testing.expectEqualSlices(u8, &.{ 0xab, 0xcd, 0xef }, z.records[0].rdata);
     try testing.expectEqualSlices(u8, &.{ 192, 0, 2, 1 }, z.records[1].rdata);
+}
+
+test "compound TTLs cannot overflow the accumulator" {
+    // Every component is capped at u32, but plain u64 accumulation let a long
+    // enough compound TTL overflow before the final range check: a panic in
+    // Debug and ReleaseSafe, and a wrapped, wrongly small TTL in an unchecked
+    // build, from the public zone parser.
+    var text: [4096]u8 = undefined;
+    var n: usize = 0;
+    for (0..300) |_| {
+        @memcpy(text[n..][0..11], "4294967295w");
+        n += 11;
+    }
+    try testing.expectError(error.BadNumber, parseTtl(text[0..n]));
+    // The bound is applied per term, so the work a hostile zone file can cause
+    // is bounded too, not just the final result.
+    try testing.expectError(error.BadNumber, parseTtl("4294967295w"));
+    try testing.expectError(error.BadNumber, parseTtl("4294967296"));
+    // 7101 weeks is the largest whole number of weeks that fits in u32
+    // (4294684800); 7102 weeks (4295289600) does not.
+    try testing.expectError(error.BadNumber, parseTtl("7102w"));
+    // Legitimate values, including the largest representable one.
+    try testing.expectEqual(@as(u32, 7101 * 604800), try parseTtl("7101w"));
+    try testing.expectEqual(@as(u32, 710 * 604800), try parseTtl("710w"));
+    try testing.expectEqual(@as(u32, 4294967295), try parseTtl("4294967295"));
+    try testing.expectEqual(@as(u32, 604800), try parseTtl("1w"));
+    try testing.expectEqual(@as(u32, 86400 + 3600 + 60 + 1), try parseTtl("1d1h1m1s"));
+}
+
+test "RRSIG timestamps reject impossible calendar dates" {
+    // daysFromCivil normalises instead of failing, so a `d <= 31` range check
+    // let 20230231000000 through as a March timestamp: a zone file or test
+    // vector stating an impossible inception or expiration was encoded as a
+    // different instant than the text says.
+    try testing.expectError(error.BadTime, parseRrsigTime("20230231000000"));
+    try testing.expectError(error.BadTime, parseRrsigTime("20230431000000")); // April has 30 days
+    try testing.expectError(error.BadTime, parseRrsigTime("20230229000000")); // 2023 is not a leap year
+    try testing.expectError(error.BadTime, parseRrsigTime("19000229000000")); // century, not 400-year
+    try testing.expectError(error.BadTime, parseRrsigTime("20231301000000")); // month 13
+    try testing.expectError(error.BadTime, parseRrsigTime("20230001000000")); // month 0
+    try testing.expectError(error.BadTime, parseRrsigTime("20230100000000")); // day 0
+    // Real leap years are accepted, including both century rules.
+    _ = try parseRrsigTime("20240229000000");
+    _ = try parseRrsigTime("20000229000000");
+    // Month ends, and the leap second the field's own range allows.
+    _ = try parseRrsigTime("20230228235959");
+    _ = try parseRrsigTime("20231231000000");
+    _ = try parseRrsigTime("20230630235960");
+}
+
+test "formatRr emits complete, parseable RDATA for DNSKEY, NSEC and NSEC3" {
+    // Both the CLI and the C ABI promise presentation-format answer records.
+    // "(256-octet key)" for a DNSKEY and "(types)" for the NSEC/NSEC3 bitmaps
+    // are not RDATA: they cannot be parsed, re-signed or reused, and a secure
+    // DNSKEY answer reaches this formatter through both paths.
+    const owner = try Name.fromText("example.");
+
+    // DNSKEY: flags 256, protocol 3, algorithm 8, key DE AD BE EF.
+    {
+        const rd = [_]u8{ 0x01, 0x00, 0x03, 0x08, 0xDE, 0xAD, 0xBE, 0xEF };
+        const rr: Rr = .{ .name = owner, .type = .dnskey, .class = .in, .ttl = 3600, .rdata = &rd };
+        var out: [256]u8 = undefined;
+        _ = &out;
+        var w = std.Io.Writer.fixed(&out);
+        try formatRr(&w, &rr);
+        try testing.expectEqualStrings("example. 3600 IN DNSKEY 256 3 8 3q2+7w==", w.buffered());
+    }
+
+    // NSEC: window 0, four octets 0x40 0x01 0x00 0x08 = types 1 (A), 15 (MX)
+    // and 28 (AAAA).
+    {
+        const rd = [_]u8{ 2, 'n', 'x', 0, 0, 4, 0x40, 0x01, 0x00, 0x08 };
+        const rr: Rr = .{ .name = owner, .type = .nsec, .class = .in, .ttl = 300, .rdata = &rd };
+        var out: [256]u8 = undefined;
+        _ = &out;
+        var w = std.Io.Writer.fixed(&out);
+        try formatRr(&w, &rr);
+        try testing.expectEqualStrings("example. 300 IN NSEC nx. A MX AAAA", w.buffered());
+    }
+
+    // NSEC3: algorithm 1, flags 0, 12 iterations, salt AABB, base32hex next.
+    {
+        const hash = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 };
+        var rd: [64]u8 = undefined;
+        rd[0] = 1;
+        rd[1] = 0;
+        std.mem.writeInt(u16, rd[2..4], 12, .big);
+        rd[4] = 2;
+        rd[5] = 0xAA;
+        rd[6] = 0xBB;
+        rd[7] = 20;
+        @memcpy(rd[8..28], &hash);
+        rd[28] = 0;
+        rd[29] = 4;
+        rd[30] = 0x40;
+        rd[31] = 0x01;
+        rd[32] = 0x00;
+        rd[33] = 0x08;
+        const rr: Rr = .{ .name = owner, .type = .nsec3, .class = .in, .ttl = 300, .rdata = rd[0..34] };
+        var out: [256]u8 = undefined;
+        _ = &out;
+        var w = std.Io.Writer.fixed(&out);
+        try formatRr(&w, &rr);
+        const got = w.buffered();
+        // The bitmap is enumerated, not elided, and the output ends with it.
+        try testing.expect(std.mem.endsWith(u8, got, " A MX AAAA"));
+        try testing.expect(std.mem.indexOf(u8, got, "(types)") == null);
+        try testing.expect(std.mem.startsWith(u8, got, "example. 300 IN NSEC3 1 0 12 aabb "));
+    }
+
+    // A DNSKEY too large for the stack buffer falls back to RFC 3597 generic
+    // form rather than printing a placeholder or overrunning.
+    {
+        var big: [2048]u8 = undefined;
+        big[0] = 0x01;
+        big[1] = 0x00;
+        big[2] = 0x03;
+        big[3] = 0x08;
+        @memset(big[4..], 0x5A);
+        const rr: Rr = .{ .name = owner, .type = .dnskey, .class = .in, .ttl = 3600, .rdata = &big };
+        var out: [8192]u8 = undefined;
+        _ = &out;
+        var w = std.Io.Writer.fixed(&out);
+        try formatRr(&w, &rr);
+        try testing.expect(std.mem.startsWith(u8, w.buffered(), "example. 3600 IN DNSKEY \\# 2048 01 00 03 08 5a"));
+    }
 }

@@ -414,6 +414,30 @@ pub const TypeBitmap = struct {
         return false;
     }
 
+    /// Fills `out` with every RR type the bitmap sets, in ascending order, and
+    /// returns the slice written; types past `out.len` are dropped. The
+    /// presentation writer has no allocator, and a real bitmap carries a
+    /// handful of types.
+    pub fn fill(self: TypeBitmap, out: []Type) []Type {
+        var n: usize = 0;
+        var p: usize = 0;
+        while (p + 2 <= self.raw.len) {
+            const window: u16 = self.raw[p];
+            const len = self.raw[p + 1];
+            for (self.raw[p + 2 ..][0..len], 0..) |octet, i| {
+                if (octet == 0) continue;
+                for (0..8) |bit| {
+                    if ((octet & (@as(u8, 0x80) >> @intCast(bit))) == 0) continue;
+                    if (n == out.len) return out[0..n];
+                    out[n] = Type.fromInt((window << 8) | (@as(u16, @intCast(i)) * 8 + @as(u16, @intCast(bit))));
+                    n += 1;
+                }
+            }
+            p += 2 + @as(usize, len);
+        }
+        return out[0..n];
+    }
+
     pub fn isEmpty(self: TypeBitmap) bool {
         var p: usize = 0;
         while (p + 2 <= self.raw.len) {

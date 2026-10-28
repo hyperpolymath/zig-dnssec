@@ -535,7 +535,16 @@ const Rewrite = struct {
     prepend: ?struct { sec: Section, rr: Rr } = null,
     append: ?struct { sec: Section, rr: Rr } = null,
     ttl: ?struct { sec: Section, value: u32 } = null,
+    /// Record types to omit from every section. Dropping the signatures is how
+    /// a signed response is turned into the unsigned one an insecure zone would
+    /// have sent; the received bytes stay byte-identical otherwise.
+    drop: []const Type = &.{},
 };
+
+fn dropped(list: []const Type, t: Type) bool {
+    for (list) |d| if (d == t) return true;
+    return false;
+}
 
 fn rewrite(gpa: std.mem.Allocator, bytes: []const u8, rw: Rewrite) ![]u8 {
     var msg = try Message.parse(gpa, bytes);
@@ -552,6 +561,7 @@ fn rewrite(gpa: std.mem.Allocator, bytes: []const u8, rw: Rewrite) ![]u8 {
     for (sections) |sec| {
         if (rw.prepend) |p| if (p.sec == sec) try b.record(sec, p.rr);
         for (msg.section(sec)) |rr| {
+            if (dropped(rw.drop, rr.type)) continue;
             if (rw.ttl) |t| if (t.sec == sec and rr.type != .opt) {
                 var copy = rr;
                 copy.ttl = t.value;
@@ -844,4 +854,47 @@ test "negative: QTYPE=RRSIG is refused rather than misreported" {
     const first = [_]transport.Recorded{.{ .qname = s.qname, .qtype = .rrsig, .response = resp }};
     const records = try merged(a, &first, s.records);
     try expectBogus(records, "www.rsasha256.test.", .rrsig, .malformed_response);
+}
+
+test "negative: a forged SOA owner cannot reach over a closer island anchor" {
+    var corpus = try Corpus.load();
+    defer corpus.deinit();
+    const a = corpus.arena.allocator();
+    const nx = try corpus.find("nx.island.test.", .a);
+    const anchors = try anchoredAt(a, "www.island.test.");
+
+    // An unsigned NXDOMAIN for a name inside the configured island, whose SOA
+    // names island.test. - provably insecure from the root anchor, but an
+    // ANCESTOR of the anchor at www.island.test. The SOA owner is
+    // unauthenticated data, and ancestry alone is not a sufficient test of it:
+    // the insecurity of island.test. says nothing about the anchored subtree
+    // below it. Accepting the hint let a responder dispose of a negative answer
+    // inside a secure island with no proof at all.
+    const forged = try rewrite(a, try recorded(nx.records, "nx.island.test.", .a), .{
+        .question = .{ .name = "x.www.island.test.", .qtype = .a },
+        .drop = &.{ .rrsig, .nsec, .nsec3 },
+    });
+    // Sanity: the authority section still carries the SOA and nothing signed.
+    {
+        var msg = try Message.parse(a, forged);
+        defer msg.deinit();
+        var soa = false;
+        var signed = false;
+        for (msg.authority) |rr| {
+            if (rr.type == .soa) soa = true;
+            if (rr.type == .rrsig or rr.type == .nsec or rr.type == .nsec3) signed = true;
+        }
+        try testing.expect(soa);
+        try testing.expect(!signed);
+    }
+
+    const first = [_]transport.Recorded{.{ .qname = try Name.fromText("x.www.island.test."), .qtype = .a, .response = forged }};
+    const records = try merged(a, &first, nx.records);
+
+    var r = try resolveWith(records, anchors, try Name.fromText("x.www.island.test."), .a, .{}, now);
+    defer r.deinit();
+    if (r.security() == .insecure) {
+        std.debug.print("unsigned NXDOMAIN accepted as insecure ({} {}); expected refusal\n", .{ r.verdict.insecure.reason, r.verdict.insecure.zone });
+        return error.TestUnexpectedResult;
+    }
 }

@@ -126,15 +126,22 @@ validator's own logic is proved yet.
 | TESTED
 | `build/container/Containerfile --target test` built on Wolfi with the
   checksum-verified Zig 0.17.0 tarball; all 110 tests (C ABI tests included) passed
-  inside it
+  inside it. That container run predates the review cycle below: the suite is 126
+  tests now, and it has not been re-run in the container since
 
 | `crosscheck` and `runtime` container targets
 | DESIGNED
 | written, not built here (Wolfi package names for NSD/ldns unverified)
 
 | DNSKEY (as opposed to DS) trust anchors; anchors below the root
-| DESIGNED
-| code in `validator.zig` (`anchoredKeys`); only `TrustAnchors.closest` is unit-tested
+| TESTED (island-anchor path only)
+| The island-anchor validation path in `validator.zig`, including `anchoredKeys`
+  and the closer-anchor checks, exercised end to end by four replay tests
+  added in the review cycle: one positive control asserting an anchored island
+  below an insecure delegation validates as `secure`, and three negatives
+  asserting a forged answer signer, a forged denial signer, and a forged SOA
+  owner cannot reach over that anchor.
+  Anchors *above* an untrusted chain, and RFC 5011 rollover, remain untested
 
 | Correctness of Zig's `std.crypto` primitives and TLS client
 | ASSUMED
@@ -203,7 +210,8 @@ two automated review passes). Twelve findings were raised against
 All twelve are fixed; the two that mattered most are described in
 `docs/architecture/THREAT-MODEL.adoc` §"What the milestone-1 review found".
 
-The test count went from 111 to 123. The twelve additions are:
+The test count went from 111 to 123 in that cycle, and to 126 in the second one
+described below. The twelve additions from the first are:
 
 * four unit tests in the sources they guard (`wire/name.zig` relative-name
   length overflow, `wire/rdata.zig` SVCB/HTTPS canonical form,
