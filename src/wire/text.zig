@@ -644,7 +644,10 @@ pub fn formatRr(w: *std.Io.Writer, rr: *const Rr) std.Io.Writer.Error!void {
         } else |_| {},
         .nsec3 => if (rdata_mod.Nsec3.parse(rd)) |n| {
             var b32: [512]u8 = undefined;
-            try w.print("{d} {d} {d} {x} {s}", .{ @backingInt(n.hash_algorithm), n.flags, n.iterations, n.salt, encoding.base32HexEncode(&b32, n.next_hashed_owner) });
+            try w.print("{d} {d} {d} ", .{ @backingInt(n.hash_algorithm), n.flags, n.iterations });
+            // RFC 5155 §3.3: an empty salt is written "-", not left empty.
+            if (n.salt.len == 0) try w.writeByte('-') else try w.print("{x}", .{n.salt});
+            try w.print(" {s}", .{encoding.base32HexEncode(&b32, n.next_hashed_owner)});
             var tbuf: [128]Type = undefined;
             for (n.types.fill(&tbuf)) |t| {
                 var mb: [16]u8 = undefined;
@@ -841,4 +844,29 @@ test "formatRr emits complete, parseable RDATA for DNSKEY, NSEC and NSEC3" {
         try formatRr(&w, &rr);
         try testing.expect(std.mem.startsWith(u8, w.buffered(), "example. 3600 IN DNSKEY \\# 2048 01 00 03 08 5a"));
     }
+}
+
+test "formatRr writes an empty NSEC3 salt as \"-\"" {
+    // RFC 5155 §3.3: an empty salt is written "-". RFC 9276 recommends the
+    // empty salt, so it is the common case; an empty field would shift every
+    // later field and make the record unparseable.
+    const owner = try Name.fromText("example.");
+    const hash = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 };
+    var rd: [64]u8 = undefined;
+    rd[0] = 1; // SHA-1
+    rd[1] = 0; // flags
+    std.mem.writeInt(u16, rd[2..4], 0, .big);
+    rd[4] = 0; // salt length
+    rd[5] = 20;
+    @memcpy(rd[6..26], &hash);
+    rd[26] = 0;
+    rd[27] = 1;
+    rd[28] = 0x40; // A
+    const rr: Rr = .{ .name = owner, .type = .nsec3, .class = .in, .ttl = 300, .rdata = rd[0..29] };
+    var out: [256]u8 = undefined;
+    var w = std.Io.Writer.fixed(&out);
+    try formatRr(&w, &rr);
+    const got = w.buffered();
+    try testing.expect(std.mem.startsWith(u8, got, "example. 300 IN NSEC3 1 0 0 - "));
+    try testing.expect(std.mem.endsWith(u8, got, " A"));
 }
