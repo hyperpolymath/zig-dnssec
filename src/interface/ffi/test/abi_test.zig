@@ -203,10 +203,25 @@ test "bad arguments fail closed: status set, security NONE" {
         try testing.expectEqual(c.expect, rc);
         try testing.expectEqual(@as(u8, h.ZIG_DNSSEC_SECURITY_NONE), v.security);
         try testing.expectEqual(@as(u32, 0), v.text_len);
-        try testing.expect(text[0] == 0 or text[0] == 'X');
+        // The header empties text before any argument is checked, so an early
+        // rejection cannot leave a previous answer readable in the buffer.
+        try testing.expectEqual(@as(u8, 0), text[0]);
+        try testing.expectEqual(@as(u8, 'X'), text[1]);
     }
-    // A NULL verdict pointer is rejected without writing anything.
+    // A NULL verdict pointer is rejected; a supplied text buffer is still
+    // emptied first.
+    var text: [64]u8 = undefined;
+    @memset(&text, 'X');
+    try testing.expectEqual(@as(c_int, h.ZIG_DNSSEC_ERR_INVALID_ARGUMENT), h.zig_dnssec_validate_trace(trace.ptr, anchors_z.ptr, "www.rsasha256.test.", qtype_a, now, 0, null, &text, text.len));
+    try testing.expectEqual(@as(u8, 0), text[0]);
     try testing.expectEqual(@as(c_int, h.ZIG_DNSSEC_ERR_INVALID_ARGUMENT), h.zig_dnssec_validate_trace(trace.ptr, anchors_z.ptr, "www.rsasha256.test.", qtype_a, now, 0, null, null, 0));
+    // The callback entry point: a NULL exchange function is rejected the same
+    // way, with the verdict NONE and the text emptied.
+    var v = poisoned();
+    @memset(&text, 'X');
+    try testing.expectEqual(@as(c_int, h.ZIG_DNSSEC_ERR_INVALID_ARGUMENT), h.zig_dnssec_validate(null, null, anchors_z.ptr, "www.rsasha256.test.", qtype_a, now, 0, &v, &text, text.len));
+    try testing.expectEqual(@as(u8, h.ZIG_DNSSEC_SECURITY_NONE), v.security);
+    try testing.expectEqual(@as(u8, 0), text[0]);
 }
 
 test "NULL anchors select the IANA root, which does not sign the fixtures" {
