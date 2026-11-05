@@ -145,12 +145,21 @@ decodeVerdict v readText = do
 ||| zig_dnssec_validate_trace). `anchors` Nothing selects the built-in IANA root
 ||| anchors. `now` is seconds since the Unix epoch. The answer buffer starts at
 ||| 64 KiB and is retried once at the size the library reports.
+|||
+||| The linked library's ABI version is checked before anything is passed to
+||| it: the verdict buffer below is sized and decoded for ABI `abiVersion`, so
+||| an unversioned libzig_dnssec of another version found on the library path
+||| could otherwise be handed a buffer of the wrong layout.
 export
 validateTrace : HasIO io =>
                 (trace : String) -> (anchors : Maybe String) -> (qname : String) ->
                 (qtype : Bits16) -> (now : Int64) -> (policy : List PolicyFlag) ->
                 io (Either CallError Outcome)
-validateTrace trace anchors qname qtype now policy = attempt 65536 (S Z)
+validateTrace trace anchors qname qtype now policy = do
+    linked <- linkedAbiVersion
+    if linked /= abiVersion
+       then pure (Left (BrokenContract ("linked library speaks ABI version " ++ show linked ++ ", this binding expects " ++ show abiVersion)))
+       else attempt 65536 (S Z)
   where
     call : Buffer -> Buffer -> Int -> io Int
     call out text cap = case anchors of

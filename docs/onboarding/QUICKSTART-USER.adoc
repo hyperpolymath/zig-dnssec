@@ -1,125 +1,68 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // Template: QUICKSTART-USER.adoc — 5-minute path to working software
-// Replace zig-dnssec, Rsr Template Repo — See README.adoc for details., just run, Rsr Template Repo started successfully. with actuals
 = zig-dnssec — Quick Start for Users
 :toc:
 :toclevels: 2
 
 == What is zig-dnssec?
 
-Rsr Template Repo — See README.adoc for details.
+Experimental pure-Zig DNS wire-format codec and DNSSEC validator with a
+DNS-over-HTTPS stub client: it authenticates answers from an untrusted upstream
+resolver to a configured trust anchor.
+
+It is a library with one command-line tool, `dnssec-stub`, which asks a
+DNS-over-HTTPS resolver and validates the answer. There is no installer and no
+configuration file, and `just install` is not wired. It is experimental and not
+independently reviewed; read the warning in the link:../../README.adoc[README]
+before relying on it.
 
 == Prerequisites
 
-Before you begin, ensure you have:
+* Zig 0.17.0: enough for `zig build`, `zig build test` and the CLI
+* Idris2 0.7.0 as well, for `just build` and `just test`, which also check the
+  Idris2 model of the C ABI
+* *just*, the task runner (https://github.com/casey/just[install guide])
 
-* **just** — task runner (https://github.com/casey/just[install guide])
-* Platform-specific requirements listed below
-
-[cols="1,3"]
-|===
-| Platform | Additional Requirements
-
-| Linux
-| See README.adoc
-
-| macOS
-| See README.adoc
-
-| Windows
-| See README.adoc
-|===
-
-== Install
-
-=== Option 1: Standard Install (recommended)
+== Build and test
 
 [source,bash]
 ----
-# Clone and set up
 git clone https://github.com/hyperpolymath/zig-dnssec.git
 cd zig-dnssec
-just setup
+zig build            # dnssec-stub, into zig-out/bin/
+zig build ffi        # libzig_dnssec and zig_dnssec.h, into zig-out/lib and include
+zig build test       # Zig only
+just test            # Zig and the Idris2 model
 ----
 
-The setup script will:
+To use the library from your own Zig project, follow "Using it" in the
+link:../../README.adoc[README].
 
-* Detect your platform and shell
-* Install missing dependencies (with your permission)
-* Configure the application
-* Offer install location choices
-* Run a self-diagnostic to verify everything works
-
-=== Option 2: Container (via Stapeln)
+== Run dnssec-stub
 
 [source,bash]
 ----
-just stapeln-run
+./zig-out/bin/dnssec-stub --doh https://cloudflare-dns.com/dns-query example.com. A
+zig build run -- --doh https://cloudflare-dns.com/dns-query example.com. A   # build and run
 ----
 
-=== Option 3: Portable (no system changes)
+It prints `verdict=<v> reason=<r> at=<name> rcode=<rc>`, then the answer records
+for a secure or insecure verdict. The exit status is the verdict: 0 secure,
+1 insecure, 2 bogus, 3 indeterminate, 4 usage or transport error. Run it with no
+arguments for the full option list.
+
+== Container
 
 [source,bash]
 ----
-just install --portable --prefix=./zig-dnssec-portable
+just container-build
 ----
 
-== First Run
+This builds `ghcr.io/hyperpolymath/zig-dnssec:latest` from
+`build/container/Containerfile`.
 
-[source,bash]
-----
-just run
-----
+== Get help
 
-Expected output:
-
-[source]
-----
-Rsr Template Repo started successfully.
-----
-
-== Self-Diagnostic
-
-If something isn't working:
-
-[source,bash]
-----
-just doctor
-----
-
-This checks all dependencies, permissions, paths, and connectivity.
-If it finds issues, it will suggest fixes.
-
-To attempt automatic repair:
-
-[source,bash]
-----
-just heal
-----
-
-== Get Help
-
-* **In-app**: `just run --help`
-* **Guided tour**: `just tour`
-* **Report a problem**: `just help-me` (pre-fills diagnostic context)
-* **Wiki**: https://github.com/hyperpolymath/zig-dnssec/wiki
-
-== Uninstall
-
-[source,bash]
-----
-just uninstall
-----
-
-You will be asked:
-
-1. Which uninstall tier (Bennett reversible, parameter-based, standard, or secure)
-2. Whether to include or exclude your data
-3. Whether to clear caches and LLM models
-
-== Next Steps
-
-* Read the link:README.adoc[README] for full feature overview
-* Read the link:EXPLAINME.adoc[EXPLAINME] for architecture and design decisions
-* Try `just tour` for a guided walkthrough
+* Report a problem: https://github.com/hyperpolymath/zig-dnssec/issues
+* Security issues: see link:../../.github/SECURITY.md[the security policy]

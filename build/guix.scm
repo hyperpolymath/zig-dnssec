@@ -39,8 +39,8 @@
   (native-inputs (map spec->input (list "git" "bash" "coreutils" "nss-certs" "just" "mise"
                                         "shellcheck" "chez-scheme" "gmp" "gcc-toolchain" "zig")))
   (home-page "https://github.com/hyperpolymath/zig-dnssec")
-  (synopsis "Rhodium Standard Repository template")
-  (description "The estate's repository template: the RSR layout, an Idris2 ABI
-seam with a Zig FFI, CI gates, and the provisioning set (launcher, Justfile,
-mise, Guix, setup and AI-assisted installation guides).")
+  (synopsis "Experimental pure-Zig DNSSEC validator and DoH stub client")
+  (description "Experimental pure-Zig DNS wire-format codec and DNSSEC validator
+with a DNS-over-HTTPS stub client: authenticates answers from an untrusted
+upstream resolver to a configured trust anchor.  Not independently reviewed.")
   (license license:mpl2.0))

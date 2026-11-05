@@ -102,15 +102,23 @@ pub const Request = struct {
     text_cap: usize,
 };
 
+/// The header's first step for every call, before any argument is checked:
+/// the verdict reads NONE and the text buffer is the empty string. Every
+/// entry point runs it first, so an early rejection can never leave a
+/// previous call's verdict or answer text in the caller's buffers.
+fn reset(req: Request) void {
+    if (req.out) |o| o.* = std.mem.zeroes(Verdict);
+    if (req.text) |p| {
+        if (req.text_cap > 0) p[0] = 0;
+    }
+}
+
 /// Runs one validation over `t` and fills the verdict. Keeps the header's
 /// fail-closed rules: `security` stays NONE unless the result is OK, and
 /// answer text is produced only for SECURE and INSECURE.
 pub fn run(gpa: Allocator, t: transport.Transport, req: Request) Status {
+    reset(req);
     const out = req.out orelse return .invalid_argument;
-    out.* = std.mem.zeroes(Verdict);
-    if (req.text) |p| {
-        if (req.text_cap > 0) p[0] = 0;
-    }
     if (req.policy & ~policy_mask != 0) return .invalid_argument;
     const qname_z = req.qname orelse return .invalid_argument;
     const qtype = Type.fromInt(req.qtype);
@@ -235,22 +243,17 @@ pub fn validateWith(
     ctx: ?*anyopaque,
     req: Request,
 ) Status {
-    if (exchange == null) {
-        if (req.out) |o| o.* = std.mem.zeroes(Verdict);
-        return .invalid_argument;
-    }
+    reset(req);
+    if (exchange == null) return .invalid_argument;
     var cb: CallbackTransport = .{ .exchange = exchange, .ctx = ctx };
     return run(gpa, cb.asTransport(), req);
 }
 
 pub fn validateTraceWith(gpa: Allocator, trace: ?[*:0]const u8, req: Request) Status {
-    const tz = trace orelse {
-        if (req.out) |o| o.* = std.mem.zeroes(Verdict);
-        return .invalid_argument;
-    };
+    reset(req);
+    const tz = trace orelse return .invalid_argument;
     if (req.out == null) return .invalid_argument;
     var tr = transport.Trace.parse(gpa, std.mem.span(tz)) catch |e| {
-        req.out.?.* = std.mem.zeroes(Verdict);
         return switch (e) {
             error.OutOfMemory => .out_of_memory,
             else => .bad_trace,
