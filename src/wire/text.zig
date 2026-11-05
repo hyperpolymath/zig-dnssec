@@ -559,6 +559,14 @@ fn genericRdata(w: *std.Io.Writer, rd: []const u8) std.Io.Writer.Error!void {
     for (rd) |b| try w.print(" {x:0>2}", .{b});
 }
 
+fn writeTypes(w: *std.Io.Writer, bitmap: rdata_mod.TypeBitmap) std.Io.Writer.Error!void {
+    var it = bitmap.iterator();
+    while (it.next()) |t| {
+        var mb: [16]u8 = undefined;
+        try w.print(" {s}", .{t.mnemonic(&mb)});
+    }
+}
+
 pub fn formatRr(w: *std.Io.Writer, rr: *const Rr) std.Io.Writer.Error!void {
     var tb: [16]u8 = undefined;
     try rr.name.format(w);
@@ -631,16 +639,11 @@ pub fn formatRr(w: *std.Io.Writer, rr: *const Rr) std.Io.Writer.Error!void {
             return w.writeAll(" (signature)");
         } else |_| {},
         // NSEC and NSEC3 used to stand in for their type bitmaps with
-        // "(types)", which is likewise not parseable. The bitmap is small, so
-        // it is enumerated into a stack buffer and written as mnemonics.
+        // "(types)", which is likewise not parseable. Every type the bitmap
+        // sets is streamed as a mnemonic; nothing is buffered, so none is lost.
         .nsec => if (rdata_mod.Nsec.parse(rd)) |n| {
             try n.next.format(w);
-            var tbuf: [128]Type = undefined;
-            for (n.types.fill(&tbuf)) |t| {
-                var mb: [16]u8 = undefined;
-                try w.print(" {s}", .{t.mnemonic(&mb)});
-            }
-            return;
+            return writeTypes(w, n.types);
         } else |_| {},
         .nsec3 => if (rdata_mod.Nsec3.parse(rd)) |n| {
             var b32: [512]u8 = undefined;
@@ -648,12 +651,7 @@ pub fn formatRr(w: *std.Io.Writer, rr: *const Rr) std.Io.Writer.Error!void {
             // RFC 5155 §3.3: an empty salt is written "-", not left empty.
             if (n.salt.len == 0) try w.writeByte('-') else try w.print("{x}", .{n.salt});
             try w.print(" {s}", .{encoding.base32HexEncode(&b32, n.next_hashed_owner)});
-            var tbuf: [128]Type = undefined;
-            for (n.types.fill(&tbuf)) |t| {
-                var mb: [16]u8 = undefined;
-                try w.print(" {s}", .{t.mnemonic(&mb)});
-            }
-            return;
+            return writeTypes(w, n.types);
         } else |_| {},
         else => {},
     }
@@ -867,6 +865,32 @@ test "formatRr writes an empty NSEC3 salt as \"-\"" {
     var w = std.Io.Writer.fixed(&out);
     try formatRr(&w, &rr);
     const got = w.buffered();
-    try testing.expect(std.mem.startsWith(u8, got, "example. 300 IN NSEC3 1 0 0 - "));
+    const prefix = "example. 300 IN NSEC3 1 0 0 - ";
+    try testing.expect(std.mem.startsWith(u8, got, prefix));
+    // The next hashed owner follows the salt: 20 octets are 32 base32hex digits.
+    const rest = got[prefix.len..];
+    try testing.expectEqual(@as(?usize, 32), std.mem.indexOfScalar(u8, rest, ' '));
     try testing.expect(std.mem.endsWith(u8, got, " A"));
+}
+
+test "formatRr writes every type in an NSEC bitmap, however many" {
+    // Window 0 with all 256 bits set: every type 0..255. A fixed buffer of
+    // types would truncate this silently and still print parseable text.
+    const owner = try Name.fromText("example.");
+    var rd: [3 + 2 + 32]u8 = undefined;
+    @memcpy(rd[0..3], &[_]u8{ 1, 'x', 0 }); // next name "x."
+    rd[3] = 0; // window 0
+    rd[4] = 32;
+    @memset(rd[5..], 0xFF);
+    const rr: Rr = .{ .name = owner, .type = .nsec, .class = .in, .ttl = 300, .rdata = &rd };
+    var out: [8192]u8 = undefined;
+    var w = std.Io.Writer.fixed(&out);
+    try formatRr(&w, &rr);
+    const got = w.buffered();
+    // Owner, TTL, class, type, next name, then one field per type.
+    var fields: usize = 0;
+    var it = std.mem.tokenizeScalar(u8, got, ' ');
+    while (it.next()) |_| fields += 1;
+    try testing.expectEqual(@as(usize, 5 + 256), fields);
+    try testing.expect(std.mem.endsWith(u8, got, " TYPE255") or std.mem.endsWith(u8, got, " ANY"));
 }

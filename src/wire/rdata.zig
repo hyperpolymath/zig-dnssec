@@ -414,29 +414,45 @@ pub const TypeBitmap = struct {
         return false;
     }
 
-    /// Fills `out` with every RR type the bitmap sets, in ascending order, and
-    /// returns the slice written; types past `out.len` are dropped. The
-    /// presentation writer has no allocator, and a real bitmap carries a
-    /// handful of types.
-    pub fn fill(self: TypeBitmap, out: []Type) []Type {
-        var n: usize = 0;
-        var p: usize = 0;
-        while (p + 2 <= self.raw.len) {
-            const window: u16 = self.raw[p];
-            const len = self.raw[p + 1];
-            for (self.raw[p + 2 ..][0..len], 0..) |octet, i| {
-                if (octet == 0) continue;
-                for (0..8) |bit| {
-                    if ((octet & (@as(u8, 0x80) >> @intCast(bit))) == 0) continue;
-                    if (n == out.len) return out[0..n];
-                    out[n] = Type.fromInt((window << 8) | (@as(u16, @intCast(i)) * 8 + @as(u16, @intCast(bit))));
-                    n += 1;
-                }
-            }
-            p += 2 + @as(usize, len);
-        }
-        return out[0..n];
+    /// Every RR type the bitmap sets, in ascending order. An iterator rather
+    /// than a fill-a-buffer call so that no caller can lose types silently:
+    /// a bitmap may set all 65536 types, and the presentation writer has no
+    /// allocator to size a buffer with.
+    pub fn iterator(self: TypeBitmap) Iterator {
+        return .{ .raw = self.raw };
     }
+
+    pub const Iterator = struct {
+        raw: []const u8,
+        /// Offset of the current window header.
+        p: usize = 0,
+        /// Octet index within the current window.
+        i: usize = 0,
+        /// Next bit to test within that octet, 0 (most significant) to 8.
+        bit: u8 = 0,
+
+        pub fn next(it: *Iterator) ?Type {
+            while (it.p + 2 <= it.raw.len) {
+                const window: u16 = it.raw[it.p];
+                const len = it.raw[it.p + 1];
+                while (it.i < len) {
+                    const octet = it.raw[it.p + 2 + it.i];
+                    while (it.bit < 8) {
+                        const b = it.bit;
+                        it.bit += 1;
+                        if ((octet & (@as(u8, 0x80) >> @intCast(b))) != 0) {
+                            return Type.fromInt((window << 8) | (@as(u16, @intCast(it.i)) * 8 + b));
+                        }
+                    }
+                    it.bit = 0;
+                    it.i += 1;
+                }
+                it.i = 0;
+                it.p += 2 + @as(usize, len);
+            }
+            return null;
+        }
+    };
 
     pub fn isEmpty(self: TypeBitmap) bool {
         var p: usize = 0;
@@ -682,4 +698,17 @@ test "canonicalize lowercases the SVCB and HTTPS TargetName" {
     // Uncompressed, `expand` round-trips it unchanged.
     var buf2: [rd.len]u8 = undefined;
     try testing.expectEqualSlices(u8, &rd, try expand(&rd, 0, rd.len, .https, &buf2));
+}
+
+test "TypeBitmap.iterator yields every set type across windows, in order" {
+    // Window 0: A (1) and MX (15). Window 1: type 257. Window 255: type 65535.
+    var raw: [4 + 3 + 2 + 32]u8 = @splat(0);
+    @memcpy(raw[0..9], &[_]u8{ 0, 2, 0x40, 0x01, 1, 1, 0x40, 255, 32 });
+    raw[raw.len - 1] = 0x01;
+    const bm = try TypeBitmap.parse(&raw);
+    var it = bm.iterator();
+    const want = [_]u16{ 1, 15, 257, 65535 };
+    for (want) |v| try std.testing.expectEqual(v, it.next().?.toInt());
+    try std.testing.expectEqual(@as(?Type, null), it.next());
+    for (want) |v| try std.testing.expect(bm.has(Type.fromInt(v)));
 }

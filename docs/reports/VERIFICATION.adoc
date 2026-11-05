@@ -260,9 +260,11 @@ response.
   the GitHub template copy), and its tree is `2c01b6f0627133f0ed2544e1edd07ed49602e117`,
   exactly the deed's `(provenance :template-tree)`. A checkout of it is
   therefore the parent at the pin, identified by tree hash rather than by
-  where the commit is stored:
+  where the commit is stored. It needs the root commit locally, so a shallow
+  clone (CI's default checkout) runs `git fetch --unshallow` first:
 +
 ----
+git fetch --unshallow   # only in a shallow clone
 git worktree add ../parent-pin 3100d46b9cfee83317018f1e8244b2fafa9da660
 bash scripts/check-variant-drift.sh ../parent-pin .
 ----

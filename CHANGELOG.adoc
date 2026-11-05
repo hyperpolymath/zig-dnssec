@@ -169,6 +169,11 @@ now guards:
 * `formatRr` wrote an empty NSEC3 salt as an empty field rather than `-`
   (RFC 5155 §3.3), so an NSEC3 answer with the salt RFC 9276 recommends was
   not parseable presentation format.
+* NSEC and NSEC3 type bitmaps were enumerated into a 128-entry buffer, and
+  `TypeBitmap.fill` dropped every type past it without saying so: a bitmap
+  setting more types printed as valid but incomplete presentation format.
+  `fill` is replaced by `TypeBitmap.iterator`, which the formatter streams,
+  so no type can be lost.
 * The user and maintainer quick starts, and `build/guix.scm`'s synopsis,
   still described the template: recipes that do not exist (`stapeln-run`,
   `stapeln-export`), unwired ones (`install`, `run`) and "Rsr Template Repo".
