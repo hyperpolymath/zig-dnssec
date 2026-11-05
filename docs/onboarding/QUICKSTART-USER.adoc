@@ -11,14 +11,17 @@ Experimental pure-Zig DNS wire-format codec and DNSSEC validator with a
 DNS-over-HTTPS stub client: it authenticates answers from an untrusted upstream
 resolver to a configured trust anchor.
 
-It is a library. There is no installer and no long-running application:
-`just install` and `just run` are not wired, and there is no configuration file.
-It is experimental and not independently reviewed; read the warning in the
-link:../../README.adoc[README] before relying on it.
+It is a library with one command-line tool, `dnssec-stub`, which asks a
+DNS-over-HTTPS resolver and validates the answer. There is no installer and no
+configuration file, and `just install` is not wired. It is experimental and not
+independently reviewed; read the warning in the link:../../README.adoc[README]
+before relying on it.
 
 == Prerequisites
 
-* Zig 0.17.0
+* Zig 0.17.0: enough for `zig build`, `zig build test` and the CLI
+* Idris2 0.7.0 as well, for `just build` and `just test`, which also check the
+  Idris2 model of the C ABI
 * *just*, the task runner (https://github.com/casey/just[install guide])
 
 == Build and test
@@ -27,12 +30,27 @@ link:../../README.adoc[README] before relying on it.
 ----
 git clone https://github.com/hyperpolymath/zig-dnssec.git
 cd zig-dnssec
-just build
-just test
+zig build            # dnssec-stub, into zig-out/bin/
+zig build ffi        # libzig_dnssec and zig_dnssec.h, into zig-out/lib and include
+zig build test       # Zig only
+just test            # Zig and the Idris2 model
 ----
 
-`just build` writes its output to `zig-out/`. To use the library from your own
-Zig project, follow "Using it" in the link:../../README.adoc[README].
+To use the library from your own Zig project, follow "Using it" in the
+link:../../README.adoc[README].
+
+== Run dnssec-stub
+
+[source,bash]
+----
+./zig-out/bin/dnssec-stub --doh https://cloudflare-dns.com/dns-query example.com. A
+zig build run -- --doh https://cloudflare-dns.com/dns-query example.com. A   # build and run
+----
+
+It prints `verdict=<v> reason=<r> at=<name> rcode=<rc>`, then the answer records
+for a secure or insecure verdict. The exit status is the verdict: 0 secure,
+1 insecure, 2 bogus, 3 indeterminate, 4 usage or transport error. Run it with no
+arguments for the full option list.
 
 == Container
 

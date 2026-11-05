@@ -8,9 +8,9 @@
 == Overview
 
 This guide covers building and packaging zig-dnssec for distribution on your
-platform. zig-dnssec is a library: it has no installer, no runnable application
-and no configuration file yet, so `just install`, `just run` and per-instance
-deployment are not wired. Only the paths below are.
+platform. zig-dnssec is a library with one command-line tool, `dnssec-stub`, and a
+C ABI (`libzig_dnssec` and `zig_dnssec.h`). It has no configuration file, and
+`just install` and per-instance deployment are not wired. Only the paths below are.
 
 == Build Dependencies
 
@@ -25,7 +25,15 @@ cd zig-dnssec
 just build
 ----
 
-Output: `zig-out/`
+Output, under `zig-out/`:
+
+* `bin/dnssec-stub`: the CLI (its exit status is the verdict: 0 secure,
+  1 insecure, 2 bogus, 3 indeterminate, 4 usage or transport error)
+* `lib/libzig_dnssec` (static and shared) and `include/zig_dnssec.h`, from
+  `zig build ffi`
+
+For a release build use `zig build -Doptimize=ReleaseSafe`; package those files
+directly, since there is no install recipe.
 
 == Packaging
 
