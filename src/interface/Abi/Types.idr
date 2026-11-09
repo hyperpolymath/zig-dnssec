@@ -329,3 +329,59 @@ policyBitsDisjoint = (Refl, Refl, Refl)
 public export
 policyWord : List PolicyFlag -> Bits32
 policyWord = foldr (\f, acc => prim__or_Bits32 (policyBit f) acc) 0
+
+--------------------------------------------------------------------------------
+-- Exact decoding
+--------------------------------------------------------------------------------
+
+-- The round trips above say decoding an encoded constructor gives it back.
+-- They do not rule out a decoder that also accepts a code no constructor
+-- encodes to (say `securityFromCode 9 = Just Secure`), which would read a
+-- corrupted verdict as SECURE. The converse closes that: every code the
+-- decoder accepts is the code of the constructor it returns.
+--
+-- For the byte-wide codes the domain has 256 values, so the converse is proved
+-- by evaluating it at every one of them: the type checker computes the check
+-- for each byte and the proof is Refl. Its trust base is the type checker and
+-- Idris2's primitive Bits8 equality, as for any proof by evaluation.
+
+||| `dec` accepts `c` only if `enc` of the result is `c`.
+public export
+decodesExactly : (Bits8 -> Maybe a) -> (a -> Bits8) -> Bits8 -> Bool
+decodesExactly dec enc c = case dec c of
+  Nothing => True
+  Just x => enc x == c
+
+||| Every byte, 255 down to 0.
+public export
+allBytes : List Bits8
+allBytes = go 255
+  where
+    go : Nat -> List Bits8
+    go Z = [0]
+    go (S k) = cast (S k) :: go k
+
+||| `allBytes` really is all 256 of them.
+export
+allBytesCount : length Abi.Types.allBytes = 256
+allBytesCount = Refl
+
+||| No byte decodes to a Security other than the one that encodes to it.
+export
+securityDecodeExact : all (decodesExactly Abi.Types.securityFromCode Abi.Types.securityCode) Abi.Types.allBytes = True
+securityDecodeExact = Refl
+
+||| No byte decodes to a Reason other than the one that encodes to it.
+export
+reasonDecodeExact : all (decodesExactly Abi.Types.reasonFromCode Abi.Types.reasonCode) Abi.Types.allBytes = True
+reasonDecodeExact = Refl
+
+||| Over status codes 0 to 255, no code decodes to a Status other than the one
+||| that encodes to it. A proof by evaluation cannot range over all of `Int`:
+||| codes outside 0..255 reach `statusFromCode`'s catch-all clause, which
+||| returns Nothing. That part is argued from the definition, not proved here.
+export
+statusDecodeExact : all (\c => case Abi.Types.statusFromCode (cast c) of
+                                 Nothing => True
+                                 Just s => Abi.Types.statusCode s == cast c) Abi.Types.allBytes = True
+statusDecodeExact = Refl

@@ -173,7 +173,14 @@ validateTrace trace anchors qname qtype now policy = do
       st <- call out text cap
       case statusFromCode st of
         Nothing => pure (Left (BrokenContract ("status code " ++ show st)))
-        Just Ok => decodeVerdict out (\n => getString text 0 (cast n))
+        Just Ok => do
+          -- The library reports how much text it wrote; a library that claims
+          -- more than the buffer holds (text and its NUL) is broken, and its
+          -- length is not used to read past the buffer.
+          tlen <- getBits32 out (off 8 "text_len")
+          if cast tlen >= cap
+            then pure (Left (BrokenContract ("text_len " ++ show tlen ++ " does not fit the " ++ show cap ++ "-byte text buffer")))
+            else decodeVerdict out (\n => getString text 0 (cast n))
         Just BufferTooSmall => case retries of
           S k => do
             need <- getBits32 out (off 8 "text_len")
