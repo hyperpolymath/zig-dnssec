@@ -1,4 +1,5 @@
 # Agda proof manifest — read by scripts/check-proofs.sh agda
 # Format: <source-root>|<module-relative-to-source-root>|gated|quarantine|<note>
 # Ground-truthed 2026-07-17 with agda (agda --safe).
-verification/proofs/agda|Properties.agda|gated| compiles under `agda --safe`
+verification/proofs/agda|Properties.agda|quarantine| template example, not a zig-dnssec obligation: imports agda-stdlib (Data.Nat), which this repo does not pin; fails "Failed to find source of module Data.Nat"
+verification/proofs/agda|ChainOfTrust.agda|gated| chain-of-trust soundness, theory source of truth (PROOF-POLICY §1, §2.1 invocation)
