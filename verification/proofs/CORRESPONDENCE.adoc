@@ -12,10 +12,10 @@ the Agda source of truth to its two recheck legs, item by item:
 
 Both legs are *re-proved*: each prover's proof was written by hand, and no
 translator is involved. A re-proof was used rather than a Dedukti transport
-because no pinned Agda→Dedukti→Rocq/Lean toolchain is installed in this
-repository's CI or in the session that wrote the proofs. The pinned Lambdapi
-release has no released Lean exporter, so §2 makes the Lean leg a re-proof
-in any case.
+because no Agda→Dedukti→Rocq/Lean toolchain is pinned in this repository,
+in its CI, or in the session that wrote the proofs. §2 also has the Lean leg
+re-proved until a released Lambdapi Lean exporter is pinned. Whether one now
+exists was not checked here.
 
 The comparison below was made by reading the three files side by side. Every
 definition and every theorem statement is listed, together with each
