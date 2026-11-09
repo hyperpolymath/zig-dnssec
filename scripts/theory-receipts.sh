@@ -51,8 +51,24 @@ receipt() {
 AGDA_IN=verification/proofs/agda/ChainOfTrust.agda
 AGDA_CMD="agda --safe --without-K --cubical-compatible ChainOfTrust.agda"
 # Comment-aware postulate scan of the import cone (this one file: it imports
-# nothing). Block comments {- -} and line comments -- are removed first.
-postulates="$(sed -e ':a;s/{-[^}]*-}//g;/{-/{N;ba}' "$AGDA_IN" | sed -e 's/--.*$//' | grep -cE '(^|[[:space:]])postulate([[:space:]]|$)' || true)"
+# nothing). Agda block comments {- -} nest (pragmas {-# #-} use the same
+# delimiters), so they are removed with a depth counter, then -- line comments
+# outside them.
+strip_agda_comments() {
+  awk '{
+    line = $0; out = ""; i = 1; n = length(line)
+    while (i <= n) {
+      two = substr(line, i, 2)
+      if (two == "{-") { depth++; i += 2; continue }
+      if (depth > 0 && two == "-}") { depth--; i += 2; continue }
+      if (depth == 0 && two == "--") break
+      if (depth == 0) out = out substr(line, i, 1)
+      i++
+    }
+    print out
+  }' "$1"
+}
+postulates="$(strip_agda_comments "$AGDA_IN" | grep -cE '(^|[[:space:]])postulate([[:space:]]|$)' || true)"
 if (cd verification/proofs/agda && $AGDA_CMD >/dev/null 2>&1) && [ "$postulates" = 0 ]; then
   receipt agda agda "$(agda --version | head -1)" "$AGDA_CMD" "$AGDA_IN" proven '[]'
   echo "agda: PROVEN (postulates: 0, import cone: $AGDA_IN only)"

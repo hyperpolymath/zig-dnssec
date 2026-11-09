@@ -3,15 +3,16 @@
 = zig-dnssec: what has been verified, and what has not
 :toc:
 
-Status as of 2026-10-13, Zig 0.17.0, Idris2 0.7.0. Every claim below is tagged with the
-estate's five statuses and names the artefact that discharges it. The PROVEN rows are
-about the C ABI seam (`src/interface/`) and are checked by Idris2; nothing about the
-validator's own logic is proved yet.
+Status as of 2026-10-13, Zig 0.17.0, Idris2 0.7.0, except where a row gives its own
+date. Every claim below is tagged with the estate's five statuses and names the artefact
+that discharges it. The PROVEN rows are about the C ABI seam (`src/interface/`), checked
+by Idris2, and, from 2026-11-09, about the chain-of-trust decision procedure as a model,
+checked in Agda, Rocq and Lean. Nothing about the validator's own code is proved.
 
 [cols="1,4",options="header"]
 |===
 | Status | Meaning here
-| PROVEN | discharged by a machine-checked proof (Idris2 typecheck of `src/interface/abi.ipkg`)
+| PROVEN | discharged by a machine-checked proof: the Idris2 typecheck of `src/interface/abi.ipkg` for the C ABI rows; Agda, Rocq and Lean, run by `scripts/theory-receipts.sh`, for the chain-of-trust model
 | TESTED | discharged by a test or run that is in the repository and reproducible
 | ASSUMED | relied on without being checked here
 | DESIGNED | built and reasoned about, but not exercised by a test
@@ -74,7 +75,8 @@ validator's own logic is proved yet.
 
 | Failures are never reported as insecure
 | PROVEN (for the chain-of-trust model) / TESTED (for the code)
-| For the decision procedure: `verification/proofs/agda/ChainOfTrust.agda` proves that
+| For the decision procedure (added 2026-11-09, after this report's snapshot):
+  `verification/proofs/agda/ChainOfTrust.agda` proves that
   `secure` and `insecure` require a fully verified chain from the anchor, and that
   any chain that is not fully verified is `bogus` (`fail-closed`). The proof is
   re-proved in Rocq and Lean, PWG-2ii (`docs/status/PROOF-STATUS.adoc`). For the code:
