@@ -28,6 +28,21 @@ ABI seam) are complete and tested, and have *not* been independently reviewed. S
 * [x] Tests keeping header, Zig and Idris2 in step; C-ABI behaviour tests
 * [x] Idris2 -> C ABI -> Zig end-to-end test, in CI
 
+== Milestone 3 — proofs to the estate policy (done, 2026-11-09)
+
+* [x] Chain-of-trust soundness as theory: `secure` and `insecure` only from a fully
+      verified chain from the anchor, everything else `bogus`. Agda source of truth,
+      re-proved in Rocq and Lean, statement correspondence recorded: PWG-2ii
+      (`verification/proofs/`)
+* [x] Idris2 ABI model: exact code decoding, proved by evaluation over all 256 byte
+      values; the wrapper refuses a mismatched ABI version and an oversized text length
+* [x] Proof ledger (`EXPLAINME.adoc#proof-ledger`), proof-status file with receipts and
+      toolchain deviations, and a `theory-proofs` CI job writing per-commit receipts
+* [x] `scripts/check-proofs.sh` uses the canonical Agda invocation. The template's
+      `agda/Properties.agda` is quarantined (it needs agda-stdlib, which is not pinned
+      here), and its `lean4/ApiTypes.lean` is promoted to gated (it compiles on
+      Lean 4.15.0)
+
 == Next
 
 . *Independent review* of the validator, the proof logic, the parsers and the DoH
@@ -42,9 +57,10 @@ ABI seam) are complete and tested, and have *not* been independently reviewed. S
   Zig-library archetype so `build.zig` and `build.zig.zon` are expected at the root.
 . A live transport for Idris2 callers: a DNS-over-HTTPS entry point in the C ABI, or
   an Idris2 callback for `zig_dnssec_validate`.
-. A model of the validator's decision procedure in which "secure" can only be built
-  from verified signatures up to an anchor (`docs/reports/VERIFICATION.adoc`, estate
-  note).
+. The remaining proof needs, in `docs/status/PROOF-NEEDS.adoc`: model to code for the
+  validator (N1), then the closest-anchor rule (N2), NSEC/NSEC3 denial (N3) and validity
+  windows (N4) as theory. Estate work that applies is tracked in
+  `hyperpolymath/zig-dnssec`#9.
 
 == Later
 

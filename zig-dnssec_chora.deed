@@ -1085,6 +1085,7 @@
     (paths
       :added (
         ".github/workflows/zig-ci.yml"
+        "EXPLAINME.adoc"
         "build.zig"
         "build.zig.zon"
         "docs/architecture.adoc"
@@ -1095,6 +1096,7 @@
         "docs/reports/VERIFICATION.adoc"
         "docs/troubleshooting.adoc"
         "docs/usage.adoc"
+        "scripts/theory-receipts.sh"
         "src/cli/"
         "src/dnssec/"
         "src/interface/E2e/"
@@ -1113,7 +1115,11 @@
         "tests/fuzz_validator.zig"
         "tests/replay.zig"
         "tests/testdata/"
-        "tests/vectors.zig")
+        "tests/vectors.zig"
+        "verification/proofs/CORRESPONDENCE.adoc"
+        "verification/proofs/agda/ChainOfTrust.agda"
+        "verification/proofs/coq/ChainOfTrust.v"
+        "verification/proofs/lean4/ChainOfTrust.lean")
       :removed (
         ".github/workflows/rust-ci.yml"
         ".machine_readable/ai/PLACEHOLDERS.adoc"
@@ -1215,6 +1221,7 @@
         "mise.lock"
         "scripts/campaigns/www-bundle.campaign"
         "scripts/check-no-placeholders.sh"
+        "scripts/check-proofs.sh"
         "scripts/validate-template.sh"
         "src/README.adoc"
         "src/interface/Abi/Foreign.idr"
@@ -1230,6 +1237,9 @@
         "tests/e2e.sh"
         "tests/e2e/template_instantiation_test.sh"
         "tests/fuzz/README.adoc"
+        "verification/proofs/agda/MANIFEST"
+        "verification/proofs/coq/MANIFEST"
+        "verification/proofs/lean4/MANIFEST"
         "www/.well-known/aibdp.json"
         "www/.well-known/humans.txt"
         "www/.well-known/security.txt"

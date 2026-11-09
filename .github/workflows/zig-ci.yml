@@ -77,6 +77,10 @@ jobs:
           tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/zig-x86_64-linux-${ZIG_VERSION}" >> "$GITHUB_PATH"
 
+      # PROOF-POLICY §6 deviation (state: open): Idris2 is built from its
+      # pinned release commit here, not installed through build/guix.scm or the
+      # container. Neither is available on the CI runner. The commit is asserted
+      # below. Record: docs/status/PROOF-STATUS.adoc, "Toolchain deviations".
       - name: Build Idris2 from the pinned release commit
         run: |
           set -euo pipefail
@@ -104,3 +108,61 @@ jobs:
           idris2 --build src/interface/E2e/abi-e2e.ipkg
           LD_LIBRARY_PATH=zig-out/lib src/interface/E2e/build/exec/abi-e2e \
             tests/testdata/crosscheck.traces tests/testdata/crosscheck-root.anchor
+
+  # Chain-of-trust theory (PROOF-POLICY §1-§2, §8): the Agda source and its Rocq
+  # and Lean re-proofs, with one receipt per leg on every commit.
+  #
+  # PROOF-POLICY §6 deviation (state: open): Agda and Rocq come from Ubuntu's
+  # apt archive and Lean from its GitHub release tarball, not from
+  # build/guix.scm or the container, which the runner lacks. Each install
+  # asserts the exact version, and Lean's tarball its sha256, before use.
+  # Record: docs/status/PROOF-STATUS.adoc, "Toolchain deviations".
+  theory-proofs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      AGDA_DEB: "2.6.3-1build1"
+      COQ_DEB: "8.18.0+dfsg-1build2"
+      LEAN_VERSION: "4.15.0"
+      LEAN_SHA256: "af71a2569a9f68337de2434829b3008cd8e32c436e9cb6bd8c84a2c2ba3585c9"
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install Agda and Rocq (version-asserted)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q "agda-bin=${AGDA_DEB}" "coq=${COQ_DEB}"
+          test "$(dpkg-query -W -f='${Version}' agda-bin)" = "$AGDA_DEB"
+          test "$(dpkg-query -W -f='${Version}' coq)" = "$COQ_DEB"
+          sha256sum "$(command -v agda)" "$(command -v coqc)"
+
+      - name: Install Lean (checksum-verified)
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -fsSL -o "$RUNNER_TEMP/lean.tar.zst" \
+            "https://github.com/leanprover/lean4/releases/download/v${LEAN_VERSION}/lean-${LEAN_VERSION}-linux.tar.zst"
+          echo "${LEAN_SHA256}  $RUNNER_TEMP/lean.tar.zst" | sha256sum -c -
+          tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/lean-${LEAN_VERSION}-linux/bin" >> "$GITHUB_PATH"
+
+      - name: Check every proof MANIFEST (Agda, Rocq, Lean)
+        run: |
+          set -euo pipefail
+          scripts/check-proofs.sh agda
+          scripts/check-proofs.sh coq
+          scripts/check-proofs.sh lean4
+
+      - name: Chain-of-trust receipts (one per leg, this commit)
+        run: |
+          set -euo pipefail
+          scripts/theory-receipts.sh "$RUNNER_TEMP/theory-receipts.jsonl"
+          {
+            echo "### Chain-of-trust receipts"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/theory-receipts.jsonl"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
