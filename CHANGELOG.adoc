@@ -49,6 +49,12 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Fixed
 
+* The deed's `(canon …)` pin moves from 2.1.3 to canon 2.1.5 (gates sha256
+  `5c510bba…`). Canon lockstep had been red since `standards` released 2.1.4
+  on 2026-11-05. The new gate table only widens accepted layouts; criteria
+  are unchanged. The template adopts the same pin in
+  hyperpolymath/rsr-template-repo#306.
+
 * Integer overflow in name decoding at the 255-octet boundary (found by
   fuzzing).
 * DNAME answers were rejected because the synthesised CNAME was examined
