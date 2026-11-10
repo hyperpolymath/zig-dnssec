@@ -97,6 +97,10 @@ predecessors did.
 | optional
 | estate docs gate (standards scripts/check-docs-presence.sh) requires CONTRIBUTING at the ROOT; this is the copy it verifies
 
+| `EXPLAINME.adoc`
+| yes
+| claims-to-evidence map and proof ledger; the estate README/EXPLAINME standard (standards docs/README-EXPLAINME-STANDARD.adoc) places it at the repository root only
+
 | `GEMINI.md`
 | optional
 | pointer to CLAUDE.md for repos without AGENTS.md yet

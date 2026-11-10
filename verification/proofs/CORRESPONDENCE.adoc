@@ -1,0 +1,173 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= Chain-of-trust theory: statement correspondence
+:toc:
+
+This is the PROOF-POLICY §2.2 record for the chain-of-trust theorems. It ties
+the Agda source of truth to its two recheck legs, item by item:
+
+* Agda: `verification/proofs/agda/ChainOfTrust.agda`
+* Rocq: `verification/proofs/coq/ChainOfTrust.v`
+* Lean: `verification/proofs/lean4/ChainOfTrust.lean`
+
+Both legs are *re-proved*: each prover's proof was written by hand, and no
+translator is involved. A re-proof was used rather than a Dedukti transport
+because no Agda→Dedukti→Rocq/Lean toolchain is pinned in this repository,
+in its CI, or in the session that wrote the proofs. §2 also has the Lean leg
+re-proved until a released Lambdapi Lean exporter is pinned. Whether one now
+exists was not checked here.
+
+The comparison below was made by reading the three files side by side. Every
+definition and every theorem statement is listed, together with each
+difference and why it does not change what is claimed.
+
+== What the theorems claim
+
+For any types `Key`, `Data` and `Sig`, any signature check
+`verify : Key → Data → Sig → Bool`, and any encoding `keyData : Key → Data`
+of a key as signed data, the procedure `validate` makes these four claims
+about the chain from a trust anchor's key `k`:
+
+[cols="1,3",options="header"]
+|===
+| Theorem | Statement
+
+| `secure-sound` / `secure_sound`
+| `validate k ls l = secure` implies `Verified k ls l` and `l` is an answer.
+
+| `insecure-sound` / `insecure_sound`
+| `validate k ls l = insecure` implies `Verified k ls l` and `l` is a denial.
+
+| `complete`
+| `Verified k ls l` implies `validate k ls l = earned l`.
+
+| `fail-closed` / `fail_closed`
+| `¬ Verified k ls l` implies `validate k ls l = bogus`.
+|===
+
+`Verified k ls l` means: each `delegate c s` link verifies under the key
+above it (`verify k (keyData c) s = true`), and the leaf verifies under the
+last key.
+
+== Definition by definition
+
+[cols="2,3,3,3",options="header"]
+|===
+| Item | Agda | Rocq | Lean
+
+| Verdicts
+| `data Verdict = secure \| insecure \| bogus`
+| `Inductive verdict := secure \| insecure \| bogus`
+| `inductive Verdict \| secure \| insecure \| bogus`
+
+| `check`
+| `check true v = v`; `check false _ = bogus`
+| same, by `match`
+| same, by pattern matching
+
+| Model parameters
+| module parameters `Key Data Sig : Set`, `verify`, `keyData`
+| section `Variables Key Data Sig : Type`, `verify`, `keyData`
+| `variable {Key Data Sig : Type}`, `verify`, `keyData`
+
+| `Link`
+| `delegate : Key → Sig → Link`
+| `delegate : Key -> Sig -> link`
+| `Link Key Sig`, `delegate : Key → Sig → Link Key Sig`
+
+| `Leaf`
+| `answer`, `denial : Data → Sig → Leaf`
+| same
+| `Leaf Data Sig` with the same two constructors
+
+| `validate`
+| three clauses: empty chain with an answer leaf, empty chain with a denial leaf, `delegate` link
+| the same three cases, by `Fixpoint` on the list
+| the same three clauses
+
+| `LeafVerified`, `Verified`
+| inductive families in `Set`
+| inductive predicates in `Prop`
+| inductive predicates in `Prop`
+
+| `IsAnswer`, `IsDenial`, `earned`
+| as listed above
+| same
+| same
+
+| Conjunction, negation, equality
+| local `_×_` (record), `¬ A = A → ⊥`, local `_≡_` (indexed `data`, `--without-K`)
+| `/\`, `~` (`-> False`), `eq`
+| `∧`, `¬` (`→ False`), `Eq`
+|===
+
+== Differences, and why they do not change the claim
+
+* *Universes.* Agda quantifies over `Set` (`Set₀`), Lean over `Type` (`Type 0`), and
+  Rocq over a section `Type` whose universe Rocq fixes at use. The theorems
+  quantify uniformly over these types and never inspect them, so each
+  statement holds at every level the prover allows. No theorem depends on
+  impredicativity: Rocq's and Lean's `Prop` is used only for the predicates
+  and connectives, and their proof terms are ordinary inductive constructions.
+* *Proof relevance.* Agda's `Verified` lives in `Set`, so a proof is data;
+  Rocq's and Lean's live in `Prop`. The theorems state existence of a
+  derivation (soundness) and an equality of verdicts (completeness, fail-closed),
+  so this does not change what is claimed.
+* *Equality.* Agda's `_≡_` is defined locally and used under `--without-K`;
+  no proof uses UIP or K. Rocq's `eq` and Lean's `Eq` are their kernels'
+  built-in equality. Every equality in the statements is between
+  constructors of `Verdict` or `Bool`, which are decidable, so the three
+  readings agree.
+* *Implicit arguments.* Lean makes `Key`, `Data` and `Sig` implicit and
+  passes `verify` and `keyData` explicitly to `validate`, `Verified` and the
+  theorems. Agda and Rocq bind them once for the module or section. The
+  bound variables are the same; only their syntax differs.
+
+== Residual assumptions
+
+* *The cryptography.* `verify` is arbitrary. Each theorem holds for every
+  signature check, so the theorems say only that the verdict reflects
+  `verify`'s answers. That a `true` from `verify` means a holder of the key
+  signed the data (unforgeability) is a cryptographic assumption about the
+  algorithms, outside all three proofs.
+* *The model.* The chain is a list of single-key delegations. DS/DNSKEY
+  splitting, key sets, closest-anchor selection, NSEC/NSEC3 semantics,
+  wildcards and validity windows are outside the model. Each is its own row in
+  `docs/status/PROOF-STATUS.adoc`.
+* *The code.* Nothing here proves that `src/dnssec/validator.zig` follows
+  `validate`. That link is a separate `argued` row in the proof-status file.
+
+== Correspondence states (§2.2)
+
+[cols="2,1,1,2",options="header"]
+|===
+| Leg | Route | §5 token | §2.2 state
+
+| Agda (source)
+| -
+| `PROVEN`
+| `AGDA-VERIFIED`
+
+| Rocq
+| `re-proved`
+| `PROVEN`
+| `RECONCILED`, by the reading above
+
+| Lean
+| `re-proved`
+| `PROVEN`
+| `RECONCILED`, by the reading above
+|===
+
+== Checking
+
+[source,shell]
+----
+agda --safe --without-K --cubical-compatible verification/proofs/agda/ChainOfTrust.agda
+(cd verification/proofs/coq && coqc ChainOfTrust.v)        # prints Print Assumptions
+(cd verification/proofs/lean4 && lean ChainOfTrust.lean)   # prints #print axioms
+----
+
+The versions, digests and observed results of each run are kept as receipts
+in `docs/status/PROOF-STATUS.adoc`. The `theory-proofs` CI job writes fresh
+receipts on every commit.

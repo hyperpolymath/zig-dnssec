@@ -1,0 +1,333 @@
+// SPDX-License-Identifier: MPL-2.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= zig-dnssec — EXPLAINME
+:toc: preamble
+:icons: font
+
+This file maps each claim in link:README.adoc[README.adoc] to the code that implements it,
+the evidence that checks it and its limits, for anyone deciding how far to trust it.
+
+[IMPORTANT]
+====
+zig-dnssec is experimental and has not been independently reviewed. Nothing below is
+a substitute for that review.
+====
+
+== Claims and their implementation
+
+=== Wire codec
+
+[quote, README.adoc]
+____
+bounds-checked decoding that rejects malformed messages (compression pointers must point
+strictly backwards; names in RDATA are decompressed only where RFC 3597 permits; trailing
+data, misplaced OPT and meta-types are rejected), and an encoder with name compression.
+____
+
+How this is implemented::
+link:src/wire/message.zig[], link:src/wire/name.zig[] and link:src/wire/rdata.zig[]. The
+presentation format is in link:src/wire/text.zig[]. Each strict prefix of a valid message
+is rejected by the unit tests, and the fuzz targets are described in
+link:docs/reports/FUZZ-RESULTS.adoc[].
+
+Caveat::
+Tested and fuzzed, not proved. Fuzzing found and fixed one integer overflow in name
+decoding.
+
+=== Signatures
+
+[quote, README.adoc]
+____
+RSASHA1, RSASHA1-NSEC3-SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256, ECDSAP384SHA384 and
+ED25519, all through Zig's standard library; DS digests SHA-1, SHA-256 and SHA-384. No
+cryptographic primitive is implemented here.
+____
+
+How this is implemented::
+link:src/dnssec/crypto.zig[] calls Zig's `std.crypto`. The tests are the RFC known-answer
+vectors in link:tests/vectors.zig[].
+
+Caveat::
+The correctness of `std.crypto` is assumed, not reviewed here (see the proof ledger).
+
+=== Chain of trust
+
+[quote, README.adoc]
+____
+DS → DNSKEY → RRSIG from the signer up to the closest trust anchor, RRSIG validity windows
+in RFC 1982 serial arithmetic, CNAME and DNAME chains, wildcard expansion.
+____
+
+How this is implemented::
+The code is link:src/dnssec/validator.zig[], link:src/dnssec/rrset.zig[] and
+link:src/dnssec/anchors.zig[]. It is checked by link:tests/replay.zig[], which replays 263
+recorded responses, and by the Unbound and ldns cross-check
+(link:tests/crosscheck/REPORT.adoc[]). The decision procedure is proved sound in
+link:verification/proofs/agda/ChainOfTrust.agda[] and re-proved in Rocq and Lean (see the
+proof ledger).
+
+Caveat::
+The proof is about a model of the chain walk. That `validator.zig` follows the model is
+argued, not proved. Closest-anchor selection, validity windows and wildcards are tested,
+not proved.
+
+=== Denial of existence
+
+[quote, README.adoc]
+____
+NSEC and NSEC3 proofs for NXDOMAIN, NODATA, wildcards and insecure delegations, including
+Opt-Out and the RFC 6840 restrictions.
+____
+
+How this is implemented::
+The code is link:src/dnssec/nsec.zig[] and link:src/dnssec/nsec3.zig[]. The tests,
+link:tests/denial.zig[], cover every Appendix B example of RFC 4035 and RFC 5155.
+
+Caveat::
+Tested, not proved. The chain-of-trust proof treats a denial as one signed object and does
+not model NSEC/NSEC3 semantics.
+
+=== Verdicts that cannot be downgraded silently
+
+[quote, README.adoc]
+____
+the result is `secure | insecure | bogus | indeterminate`. Answer data is reachable only
+from the `secure` arm, or from the `insecure` arm together with the reason and the zone at
+which insecurity was _proven_. Every failure is `bogus` or `indeterminate`.
+____
+
+How this is implemented::
+In the library, the `Verdict` tagged union in link:src/dnssec/validator.zig[] carries an
+answer only in the `secure` and `insecure` arms. At the C ABI, the Idris2 model in
+link:src/interface/Abi/Types.idr[] makes an answer unrepresentable for Bogus and
+Indeterminate. In the theory, the `fail-closed` theorem says a chain that is not fully
+verified is `bogus`.
+
+Caveat::
+The Zig union is a type-level guarantee checked by the Zig compiler, not by a proof. The
+theory covers the model, not the code.
+
+=== Stub client
+
+[quote, README.adoc]
+____
+DoH over TLS 1.2/1.3 with certificate verification, optional HTTP CONNECT proxy (TLS end to
+end), RFC 8467 query padding.
+____
+
+How this is implemented::
+link:src/stub/doh.zig[] and link:src/stub/client.zig[]. Every cross-check query goes
+through this transport.
+
+Caveat::
+Zig 0.17.0's `std.http.Client` sends HTTPS requests in cleartext through a CONNECT proxy, so
+the transport drives `std.crypto.tls.Client` itself. Correctness of the TLS client is
+assumed.
+
+=== From C, Idris2 and other languages
+
+[quote, README.adoc]
+____
+The header is the contract: a verdict whose security is never `SECURE` unless the call
+succeeded, and answer text only for `SECURE` and `INSECURE`.
+____
+
+How this is implemented::
+The contract is link:src/interface/ffi/include/zig_dnssec.h[], implemented in
+link:src/interface/ffi/src/main.zig[]. It is checked three ways:
++
+* link:src/interface/ffi/test/abi_test.zig[] runs the C behaviour;
+* link:src/interface/ffi/test/seam_test.zig[] compares the Idris2 model with the header;
+* link:src/interface/E2e/Main.idr[] runs Idris2 → C → Zig end to end.
+
+Caveat::
+The Idris2 FFI marshalling and the library's memory safety are assumed (see the proof
+ledger).
+
+== Dogfooded Across The Account
+
+[cols="1,2,2", options="header"]
+|===
+| Technology / Pattern | Used here | Also used in
+
+| Idris2 interface and ABI proofs
+| `src/interface/Abi/`: verdict codes, layout, and no answer with a failed verdict
+| link:https://github.com/hyperpolymath/proven[proven],
+  link:https://github.com/hyperpolymath/proven-servers[proven-servers]
+
+| Agda theory rechecked in Rocq and Lean (PROOF-POLICY §1–§2)
+| `verification/proofs/`: chain-of-trust soundness
+| link:https://github.com/hyperpolymath/mathesis[mathesis] (the estate proof catalogue),
+  link:https://github.com/hyperpolymath/echidna[echidna] (multi-prover exchange)
+
+| RSR template seams and gates (deed, contractiles, variant contract)
+| the repository layout, `just validate`, `scripts/check-variant-drift.sh`
+| link:https://github.com/hyperpolymath/rsr-template-repo[rsr-template-repo]
+|===
+
+== Known gaps
+
+[CAUTION]
+====
+Not implemented, as the README says: DNS-over-QUIC, Ed448 and GOST/SM2 signatures,
+HTTP/2, RFC 5011 trust-anchor rollover, negative trust anchors, caching and QTYPE `ANY`.
+What each gap means for a caller is in link:docs/architecture/THREAT-MODEL.adoc[].
+====
+
+[CAUTION]
+====
+Proofs stop at the model. That `validator.zig` follows the proved chain-of-trust
+procedure is argued, not proved. Tracked in
+link:https://github.com/hyperpolymath/zig-dnssec/issues/9[#9].
+====
+
+[CAUTION]
+====
+Independent review: none yet. Live validation against the real root was run by hand
+once (2026-10-13) and is not automated.
+====
+
+[[evidence-index]]
+== Evidence Index
+
+[cols="2,3", options="header"]
+|===
+| Path | Proves
+
+| link:docs/reports/VERIFICATION.adoc[]
+| Every claim with its status and artefact, including the cross-check and fuzzing detail
+
+| link:docs/status/PROOF-STATUS.adoc[]
+| The proof-status file: grades, receipts, assumptions and toolchain deviations
+
+| link:verification/proofs/CORRESPONDENCE.adoc[]
+| How the Agda, Rocq and Lean statements of the theory correspond
+
+| link:tests/crosscheck/REPORT.adoc[]
+| Every disagreement with Unbound and ldns, explained
+|===
+
+[[proof-ledger]]
+== Proof Ledger
+
+Rows use the closed status vocabulary of the README/EXPLAINME standard
+(`proven`, `proven-with-postulates`, `argued`, `tested-only`, `open`); PROOF-POLICY §5
+names them `PROVEN`, `PROVEN-WITH-AXIOMS`, `ASSUMED`, `TESTED` and `OPEN`. The checker
+versions are those of the latest receipts in `docs/status/PROOF-STATUS.adoc`.
+
+[cols="3,1,2,3,3", options="header"]
+|===
+| Obligation | Status | Checker (version, flags) | Where | Trust boundary
+
+| Chain-of-trust soundness: `secure` and `insecure` only from a fully verified chain from the anchor; anything else is `bogus` (theory, Agda source)
+| proven
+| Agda 2.6.3, `--safe --without-K --cubical-compatible`
+| `verification/proofs/agda/ChainOfTrust.agda`: `secure-sound`, `insecure-sound`, `complete`, `fail-closed`
+| A model of the chain walk; the signature check is a parameter, so unforgeability is outside the proof
+
+| The same four theorems, Rocq leg (re-proved)
+| proven
+| Coq 8.18.0, `coqc`; `Print Assumptions`: closed
+| `verification/proofs/coq/ChainOfTrust.v`
+| Statement correspondence with the Agda source by reading, `verification/proofs/CORRESPONDENCE.adoc`
+
+| The same four theorems, Lean leg (re-proved)
+| proven
+| Lean 4.15.0, `lean`; `#print axioms`: none
+| `verification/proofs/lean4/ChainOfTrust.lean`
+| As for the Rocq leg
+
+| `validator.zig` follows the proved chain-of-trust procedure
+| argued
+| -
+| `docs/reports/VERIFICATION.adoc` (estate note), `verification/proofs/CORRESPONDENCE.adoc`
+| Not formalised; the code is tested against the same failures (`tests/replay.zig`)
+
+| C ABI codes: status, security and reason codes round-trip
+| proven
+| Idris2 0.7.0, `--typecheck src/interface/abi.ipkg`, `%default total`, no escape hatch
+| `src/interface/Abi/Types.idr`: `statusRoundTrip`, `securityRoundTrip`, `reasonRoundTrip`
+| The model of the header; its agreement with the header is the seam row below
+
+| No byte decodes to a constructor other than the one that encodes to it (security and reason: all 256 values; status: codes 0..255)
+| proven
+| Idris2 0.7.0, as above (proof by evaluation)
+| `src/interface/Abi/Types.idr`: `securityDecodeExact`, `reasonDecodeExact`, `statusDecodeExact`, `allBytesCount`
+| Idris2's primitive `Bits8`/`Int` equality
+
+| Status codes outside 0..255 decode to no status
+| argued
+| -
+| `src/interface/Abi/Types.idr`: `statusFromCode`'s catch-all clause
+| A proof by evaluation cannot range over all of `Int`
+
+| A zeroed verdict decodes to no verdict
+| proven
+| Idris2 0.7.0, as above
+| `src/interface/Abi/Types.idr`: `zeroIsNoVerdict`
+| -
+
+| No answer can be returned with a Bogus or Indeterminate verdict
+| proven
+| Idris2 0.7.0, as above
+| `src/interface/Abi/Types.idr`: `answerOnlyIfUsable`; `src/interface/Abi/Foreign.idr`: `Outcome`, `answerOf`
+| Idris2 callers only; C callers rely on the header contract and the tests below
+
+| The verdict struct's fields are aligned, in order, not overlapping, and its size is a multiple of its alignment
+| proven
+| Idris2 0.7.0, as above
+| `src/interface/Abi/Layout.idr`: `verdictLayoutValid`
+| Natural alignment and 8-bit bytes, as on the 64-bit targets built for
+
+| The Idris2 model matches the C header as the C compiler sees it (codes, offsets, sizes, `%foreign` parameter kinds)
+| tested-only
+| `zig build test`
+| `src/interface/ffi/test/seam_test.zig`
+| Eleven planted mismatches, one of each kind, were each caught when the test was written
+
+| The Zig exports have exactly the header's types, and every validator reason has a header code
+| tested-only
+| Zig 0.17.0 compiler, every build
+| `src/interface/ffi/src/main.zig`: `exportChecked`, `reasonCode`
+| A compile-time check by the Zig compiler, not a proof kernel
+
+| The C ABI fails closed: security NONE on every non-OK status; no answer text for any of the 51 recorded bogus scenarios; text emptied before argument checks
+| tested-only
+| `zig build test`
+| `src/interface/ffi/test/abi_test.zig`
+| The recorded scenarios and the listed bad-argument cases
+
+| The Idris2 wrapper refuses a library of another ABI version, and a reported text length that does not fit its buffer
+| tested-only
+| `just abi-e2e`
+| `src/interface/Abi/Foreign.idr`: `validateTrace`; `src/interface/E2e/Main.idr`
+| The negative controls (ABI 2, over-reported `text_len`) were run by hand, not in CI
+
+| The Idris2 FFI marshalling (Chez backend) passes values as the `%foreign` types say
+| argued
+| -
+| `src/interface/Abi/Foreign.idr` (header comment)
+| Idris2 0.7.0 (`27780073`) runtime, assumed (PROOF-POLICY §1.1)
+
+| Closest-anchor selection: an insecure ancestor cannot override a closer anchor
+| tested-only
+| `zig build test`
+| `tests/replay.zig` (four island-anchor cases)
+| Not in the chain-of-trust model
+
+| NSEC and NSEC3 denial proofs are correct
+| tested-only
+| `zig build test`
+| `tests/denial.zig`
+| Every RFC 4035 and RFC 5155 Appendix B example; not proved
+
+| Signature verification is correct
+| argued
+| -
+| `src/dnssec/crypto.zig` over `std.crypto`
+| Zig 0.17.0 `std.crypto`, assumed; RFC vectors in `tests/vectors.zig` test the calls
+|===
+
+Census of rows: 8 `proven` of 18; 6 `tested-only`, 4 `argued`, 0 `open`. The closest-anchor
+rule, denial semantics and the model-to-code link are the rows with no proof yet;
+`docs/status/PROOF-NEEDS.adoc` lists them as needs.

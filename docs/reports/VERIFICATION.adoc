@@ -3,15 +3,16 @@
 = zig-dnssec: what has been verified, and what has not
 :toc:
 
-Status as of 2026-10-13, Zig 0.17.0, Idris2 0.7.0. Every claim below is tagged with the
-estate's five statuses and names the artefact that discharges it. The PROVEN rows are
-about the C ABI seam (`src/interface/`) and are checked by Idris2; nothing about the
-validator's own logic is proved yet.
+Status as of 2026-10-13, Zig 0.17.0, Idris2 0.7.0, except where a row gives its own
+date. Every claim below is tagged with the estate's five statuses and names the artefact
+that discharges it. The PROVEN rows are about the C ABI seam (`src/interface/`), checked
+by Idris2, and, from 2026-11-09, about the chain-of-trust decision procedure as a model,
+checked in Agda, Rocq and Lean. Nothing about the validator's own code is proved.
 
 [cols="1,4",options="header"]
 |===
 | Status | Meaning here
-| PROVEN | discharged by a machine-checked proof (Idris2 typecheck of `src/interface/abi.ipkg`)
+| PROVEN | discharged by a machine-checked proof: the Idris2 typecheck of `src/interface/abi.ipkg` for the C ABI rows; Agda, Rocq and Lean, run by `scripts/theory-receipts.sh`, for the chain-of-trust model
 | TESTED | discharged by a test or run that is in the repository and reproducible
 | ASSUMED | relied on without being checked here
 | DESIGNED | built and reasoned about, but not exercised by a test
@@ -73,18 +74,24 @@ validator's own logic is proved yet.
   wildcard without proof, positive answer relabelled NXDOMAIN, ...)
 
 | Failures are never reported as insecure
-| TESTED (for the cases above) / DESIGNED (in general)
-| the mutation tests assert `bogus`; the type of `Verdict` makes the answer unreachable
-  from failure arms, and at the C ABI seam the Idris2 model makes it unrepresentable
-  (PROVEN row above). A proof about the validator's own decisions is OPEN (see the
-  estate note below).
+| PROVEN (for the chain-of-trust model) / TESTED (for the code)
+| For the decision procedure (added 2026-11-09, after this report's snapshot):
+  `verification/proofs/agda/ChainOfTrust.agda` proves that
+  `secure` and `insecure` require a fully verified chain from the anchor, and that
+  any chain that is not fully verified is `bogus` (`fail-closed`). The proof is
+  re-proved in Rocq and Lean, PWG-2ii (`docs/status/PROOF-STATUS.adoc`). For the code:
+  the mutation tests assert `bogus`; the type of `Verdict` makes the answer
+  unreachable from failure arms; and at the C ABI seam the Idris2 model makes it
+  unrepresentable (PROVEN row above). That `validator.zig` follows the model is
+  argued, not proved (see the estate note below).
 
 | Resource limits (fetches, signatures, failures per RRset, NSEC3 hashes)
 | TESTED
 | `tests/replay.zig` budget cases; `tests/denial.zig` hash budget
 
-| C ABI seam, Idris2 model: every status, security and reason code round-trips; code 0
-  decodes to no verdict; the verdict struct's fields are aligned, in order, not
+| C ABI seam, Idris2 model: every status, security and reason code round-trips, and no
+  byte decodes to a constructor other than the one that encodes to it (all 256 values;
+  status codes 0..255); code 0 decodes to no verdict; the verdict struct's fields are aligned, in order, not
   overlapping, and its size is a multiple of its alignment; an `Outcome` for `Bogus` or
   `Indeterminate` cannot hold an answer, and `answerOf` cannot be applied to one
 | PROVEN
@@ -290,11 +297,23 @@ bash scripts/check-variant-drift.sh ../parent-pin .
 The guarantee "answer data is only reachable with secure evidence or a proven-insecure
 reason" is the kind of invariant the estate's epistemic-types work is meant to state: a
 `secure` answer as knowledge, `insecure` as justified absence of authentication, and no
-path from `bogus` to an answer. It is now stated as a type at the ABI seam
-(`src/interface/Abi/`): an Idris2 caller cannot receive answer data with a bogus or
-indeterminate verdict, even if the library wrote answer text for one (the FFI
-marshalling and the library's memory safety are assumed). Inside the library the same
-guarantee rests on the shape of a Zig tagged union and on tests. The next step towards
-PROVEN is a model of the validator's decision procedure (the chain walk and the denial
-proofs) in which "secure" can only be built from verified signatures up to an anchor;
-that is a larger piece of work and is not started.
+path from `bogus` to an answer. It is proved at two levels:
+
+* *At the ABI seam* (`src/interface/Abi/`, Idris2, engineering): an Idris2 caller cannot
+  receive answer data with a bogus or indeterminate verdict, even if the library wrote
+  answer text for one. The FFI marshalling and the library's memory safety are assumed.
+* *For the decision procedure* (`verification/proofs/`, theory): for any signature
+  check, a validator that walks signed keys down from a trust anchor returns `secure`
+  only for a fully verified chain ending in a signed answer, and `insecure` only for a
+  fully verified chain ending in a verified denial. Any other chain is `bogus`. Agda is
+  the source of truth; Rocq and Lean re-prove it, and the statements are compared in
+  `verification/proofs/CORRESPONDENCE.adoc`.
+
+Still open:
+
+* that `src/dnssec/validator.zig` follows that procedure (an `argued` row in the ledger);
+* the closest-anchor rule, the NSEC/NSEC3 denial semantics, wildcards and validity
+  windows, each tested but outside the model.
+
+Each one is a row in the proof ledger (`EXPLAINME.adoc#proof-ledger`), and
+`docs/status/PROOF-NEEDS.adoc` lists them as needs.

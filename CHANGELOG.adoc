@@ -30,8 +30,30 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
   the interface (`src/interface/Abi/`) whose result type cannot carry an
   answer for a bogus or indeterminate verdict; tests keep the three in step,
   and an Idris2 end-to-end test (`just abi-e2e`) runs in CI.
+* Chain-of-trust soundness as theory (PROOF-POLICY §1): for any signature check, a
+  validator walking signed keys down from a trust anchor returns `secure` or
+  `insecure` only for a fully verified chain, and `bogus` for anything else. Agda is
+  the source of truth (`verification/proofs/agda/ChainOfTrust.agda`, `--safe
+  --without-K --cubical-compatible`). Rocq and Lean re-prove it, and the statement
+  correspondence is in `verification/proofs/CORRESPONDENCE.adoc`: PWG-2ii, no axioms
+  in any leg. `scripts/theory-receipts.sh` and the `theory-proofs` CI job write one
+  receipt per leg on each commit.
+* Proof ledger (`EXPLAINME.adoc#proof-ledger`) and a proof-status file
+  (`docs/status/PROOF-STATUS.adoc`) with grades, receipts, boundary assumptions and
+  toolchain deviations. They replace the template's status files, which still read
+  "0% proven" and listed template obligations.
+* Idris2 ABI model: decoding is exact. No byte decodes to a code other than its own,
+  proved by evaluation over all 256 values (status codes: 0..255). The safe wrapper
+  refuses a library of another ABI version, and a reported text length that does not
+  fit its buffer.
 
 ==== Fixed
+
+* The deed's `(canon …)` pin moves from 2.1.3 to canon 2.1.5 (gates sha256
+  `5c510bba…`). Canon lockstep had been red since `standards` released 2.1.4
+  on 2026-11-05. The new gate table only widens accepted layouts; criteria
+  are unchanged. The template adopts the same pin in
+  hyperpolymath/rsr-template-repo#306.
 
 * Integer overflow in name decoding at the 255-octet boundary (found by
   fuzzing).

@@ -1,122 +1,67 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-// Template: rsr-template-repo/docs/status/PROOF-NEEDS.adoc
-// Authoritative master list: ~/Desktop/PROOF-REQUIREMENTS-MASTER.adoc
-= Proof Requirements — ZIG_DNSSEC
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= Proof Needs — zig-dnssec
 
-== Proof Tier
+The proofs zig-dnssec still needs, in order of the risk they would retire.
 
-// Assign one: T1 (Critical), T2 (High), T3 (Standard), T4 (Light), T5 (Exempt)
-*Tier*: T3 — Standard
+* What is already proved, tested or argued: the ledger in
+  link:../../EXPLAINME.adoc#proof-ledger[EXPLAINME.adoc].
+* Grades, receipts, assumptions and toolchain deviations:
+  link:PROOF-STATUS.adoc[PROOF-STATUS.adoc].
+* Which prover carries which obligation: PROOF-POLICY §1 (`hyperpolymath/standards`,
+  `3-practice/PROOF-POLICY.adoc`). In short, Idris2 for the C ABI and other
+  engineering properties of this repository, and Agda for theory, rechecked in Rocq and
+  Lean. No Mathlib.
 
-== Proof Categories
+*Tier*: T3 — Standard, as set at mint. It has not been reassessed for a security-relevant
+validator; reassessing it is the owner's call.
 
-[cols="1,3,1", options="header"]
+== Needs
+
+[cols="1,4,1,1,3",options="header"]
 |===
-| Code | Meaning | Applies?
+| # | Proof needed | Kind | Prover | Notes
 
-| *TP* | Typing Proofs (type soundness, type safety) | Yes
-| *INV* | Invariant Proofs (state machines, monotonicity, bounds) |
-| *SEC* | Security Proofs (crypto, injection freedom, access control) |
-| *CONC* | Concurrency Proofs (linearizability, deadlock freedom) |
-| *ALG* | Algorithm Proofs (termination, correctness, bounds) |
-| *ABI* | ABI/FFI Proofs (memory layout, pointer safety, platform compat) | Yes
-| *DOM* | Domain-Specific Proofs (bespoke to this project) |
-|===
+| N1
+| `src/dnssec/validator.zig` follows the proved chain-of-trust procedure (model to code)
+| engineering
+| -
+| `argued` today. One route: generate a table of verdicts from the model and check that the code agrees on it, as in the estate's worked ledger example ("the proved table is the code's table"). Zig has no mapped verifier (PROOF-POLICY §1).
 
-== Mandatory Proofs (All RSR Repos)
+| N2
+| Closest anchor: insecurity proved at a zone does not apply below a closer trust anchor
+| theory
+| Agda, then Rocq and Lean
+| `tested-only` today (four island-anchor replay tests). This is the property behind both P1 findings of the #4 review.
 
-These proofs come from the zig-dnssec and MUST be present in every repo:
+| N3
+| NSEC and NSEC3 denial: a verified record set proves NXDOMAIN, NODATA and an insecure delegation exactly when RFC 4035 and RFC 5155 say it does
+| theory
+| Agda, then Rocq and Lean
+| `tested-only` today (every RFC Appendix B example). The chain-of-trust model treats a denial as one signed object.
 
-=== ABI/FFI Boundary Proofs (Idris2)
+| N4
+| RRSIG validity windows: the RFC 1982 serial-arithmetic comparison is correct, including wrap-around
+| theory
+| Agda, then Rocq and Lean
+| `tested-only` today (`src/dnssec/rrset.zig` tests). Small and self-contained.
 
-[cols="1,3,1,3", options="header"]
-|===
-| # | Proof | Status | File
+| N5
+| The status decoder accepts no code outside 0..255
+| engineering
+| Idris2
+| `argued` today (the catch-all clause). A proof needs reasoning over all of `Int`, which proof by evaluation cannot do.
 
-| ABI-1 | Non-null pointer proofs (`So (ptr /= 0)`) | Needed | `verification/proofs/idris2/ABI/Pointers.idr`
-| ABI-2 | Memory layout correctness (`HasSize`, `HasAlignment`) | Needed | `verification/proofs/idris2/ABI/Layout.idr`
-| ABI-3 | Platform type size proofs (per platform) | Needed | `verification/proofs/idris2/ABI/Platform.idr`
-| ABI-4 | FFI function return type proofs | Needed | `verification/proofs/idris2/ABI/Foreign.idr`
-| ABI-5 | C ABI compliance (`CABICompliant`, `FieldsAligned`) | Needed | `verification/proofs/idris2/ABI/Compliance.idr`
-|===
-
-=== Typing Proofs (Prover Varies)
-
-[cols="1,3,1,3", options="header"]
-|===
-| # | Proof | Status | File
-
-| TP-1 | Core data type well-formedness | Needed | `verification/proofs/idris2/Types.idr`
-| TP-2 | Public API type safety (exported functions) | Needed | `verification/proofs/lean4/ApiTypes.lean`
-|===
-
-== Project-Specific Proofs
-
-// Fill in proofs specific to this project. Copy from PROOF-REQUIREMENTS-MASTER.adoc
-// Delete this section for T4/T5 repos
-
-[cols="1,3,1,1,1,2", options="header"]
-|===
-| # | Proof Needed | Category | Prover | Priority | File(s)
-
-| | | | | |
+| N6
+| `PWG-1` for the chain-of-trust theorems
+| process
+| -
+| Needs a current headless, pinned receipt on each commit. The `theory-proofs` CI job writes the receipts; the grade becomes derivable once one exists for the commit.
 |===
 
-== Dangerous Patterns (BANNED)
+== Escape hatches
 
-The following MUST NOT appear anywhere in proof files:
-
-[cols="2,2,3", options="header"]
-|===
-| Pattern | Language | Meaning
-
-| `believe_me` | Idris2 | Unsafe cast / trust-me
-| `assert_total` | Idris2 | Skip totality check
-| `postulate` | Idris2/Agda | Unproven axiom
-| `sorry` | Lean4 | Incomplete proof
-| `Admitted` | Coq | Incomplete proof
-| `unsafeCoerce` | Haskell | Unsafe type cast
-| `Obj.magic` | OCaml/ | Unsafe type cast
-| `unsafe` (unaudited) | Rust | Unsafe block without safety comment
-|===
-
-CI will reject any PR introducing these patterns (enforced by `panic-attack assail`).
-
-== Prover Selection Guide
-
-[cols="2,2,3", options="header"]
-|===
-| Use Case | Recommended Prover | Why
-
-| ABI/FFI boundaries | *Idris2* | Dependent types model layouts precisely
-| Type system proofs | *Coq* or *Lean4* | Mature proof assistants for metatheory
-| Algebraic properties | *Lean4* | Good mathlib support
-| Inductive/coinductive | *Agda* | Native support for (co)induction
-| Distributed systems | *TLA+* | Model checking for protocols
-| Numerical properties | *Isabelle* | Strong real analysis library
-|===
-
-== Proof File Locations
-
-----
-verification/proofs/
-├── idris2/          # Idris2 proofs (ABI, dependent types)
-│   ├── ABI/         # ABI-specific proofs
-│   └── *.idr        # Project-specific Idris2 proofs
-├── lean4/           # Lean4 proofs (algebra, lattices)
-│   └── *.lean
-├── agda/            # Agda proofs (induction, metatheory)
-│   └── *.agda
-├── coq/             # Coq proofs (type systems, compilation)
-│   └── *.v
-└── tlaplus/         # TLA+ specs (distributed protocols)
-    └── *.tla
-----
-
-== References
-
-* Master list: `~/Desktop/PROOF-REQUIREMENTS-MASTER.adoc`
-* Proof status tracking: `PROOF-STATUS.adoc` (this repo)
-* Proven library: `proven` repo (Idris2 verified foundations)
-* Template: `rsr-template-repo/docs/status/PROOF-NEEDS.adoc`
+What counts as an escape hatch, and how any that are allowed are budgeted and recorded,
+is set by `docs/TRUSTED-BASE-REDUCTION-POLICY.adoc` in `hyperpolymath/standards`. None
+of zig-dnssec's own proof files uses one: no `believe_me`, `assert_total`, `postulate`,
+`sorry`, `Admitted` or `axiom`.

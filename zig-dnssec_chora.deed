@@ -30,9 +30,9 @@
   ; equal canon.lock [canon.artifacts]; canon.lock [canon.lockstep].order is
   ; spine-adopts-then-canon-releases, so this clause moves FIRST.
   (canon
-    :version "2.1.3"
+    :version "2.1.5"
     :criteria-sha256 "6a5aa8857bd0d0d58ef48827938ca17c251b6b854dacf59d306388d61694d82a"
-    :gates-sha256 "2f31f46d4753432e0aa8c9c28f339e18e062c98dc6e6ef4ecbb76993cf37638b"
+    :gates-sha256 "5c510bba025be718deebb12d0333bfe7db2da43c66578b728b1a334df65290b1"
     :lockstep-since "2026-09-17"
     ; A canon change this repo cannot satisfy is a change made in the WRONG
     ; ORDER, not a rejected change: land the spine's adoption first, then the
@@ -1085,6 +1085,7 @@
     (paths
       :added (
         ".github/workflows/zig-ci.yml"
+        "EXPLAINME.adoc"
         "build.zig"
         "build.zig.zon"
         "docs/architecture.adoc"
@@ -1095,6 +1096,7 @@
         "docs/reports/VERIFICATION.adoc"
         "docs/troubleshooting.adoc"
         "docs/usage.adoc"
+        "scripts/theory-receipts.sh"
         "src/cli/"
         "src/dnssec/"
         "src/interface/E2e/"
@@ -1113,7 +1115,11 @@
         "tests/fuzz_validator.zig"
         "tests/replay.zig"
         "tests/testdata/"
-        "tests/vectors.zig")
+        "tests/vectors.zig"
+        "verification/proofs/CORRESPONDENCE.adoc"
+        "verification/proofs/agda/ChainOfTrust.agda"
+        "verification/proofs/coq/ChainOfTrust.v"
+        "verification/proofs/lean4/ChainOfTrust.lean")
       :removed (
         ".github/workflows/rust-ci.yml"
         ".machine_readable/ai/PLACEHOLDERS.adoc"
@@ -1215,6 +1221,7 @@
         "mise.lock"
         "scripts/campaigns/www-bundle.campaign"
         "scripts/check-no-placeholders.sh"
+        "scripts/check-proofs.sh"
         "scripts/validate-template.sh"
         "src/README.adoc"
         "src/interface/Abi/Foreign.idr"
@@ -1230,6 +1237,9 @@
         "tests/e2e.sh"
         "tests/e2e/template_instantiation_test.sh"
         "tests/fuzz/README.adoc"
+        "verification/proofs/agda/MANIFEST"
+        "verification/proofs/coq/MANIFEST"
+        "verification/proofs/lean4/MANIFEST"
         "www/.well-known/aibdp.json"
         "www/.well-known/humans.txt"
         "www/.well-known/security.txt"

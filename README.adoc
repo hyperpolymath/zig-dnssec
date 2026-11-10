@@ -133,10 +133,16 @@ is sent anywhere. Running the tests needs no network. Only the live examples abo
 zig build test                         # unit, RFC vector, denial, replay, fuzz smoke and C ABI tests
 idris2 --typecheck src/interface/abi.ipkg   # proofs of the Idris2 ABI model
 just abi-e2e                           # Idris2 -> C ABI -> Zig end to end
+scripts/theory-receipts.sh             # chain-of-trust theory: Agda, Rocq and Lean, with receipts
 zig build fuzz --fuzz=500K -Doptimize=ReleaseSafe      # coverage-guided fuzzing
 zig build fuzz-tool -Doptimize=ReleaseSafe && ./zig-out/bin/dnssec-fuzz all 60
 tests/crosscheck/make-zones.sh && tests/crosscheck/servers.sh start && tests/crosscheck/run.sh
 ----
+
+What is proved, tested or only argued, and how strongly, is the proof ledger in
+link:EXPLAINME.adoc#proof-ledger[EXPLAINME.adoc]: 8 proven of 18 rows; 6 tested-only,
+4 argued, 0 open. The theory needs Agda 2.6.3, Coq 8.18 and Lean 4.15; versions and
+receipts are in link:docs/status/PROOF-STATUS.adoc[docs/status/PROOF-STATUS.adoc].
 
 The cross-check needs NSD, Unbound, ldns tools and haproxy; `build/container/Containerfile`
 provides them. Its latest output is link:tests/crosscheck/REPORT.adoc[`tests/crosscheck/REPORT.adoc`].

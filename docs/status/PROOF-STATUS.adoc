@@ -1,101 +1,186 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-// Template: rsr-template-repo/docs/status/PROOF-STATUS.adoc
-// Tracks proof completion. Requirements defined in PROOF-NEEDS.adoc
-= Proof Status — ZIG_DNSSEC
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+= Proof Status — zig-dnssec
+:toc:
 
-== Summary
+This is zig-dnssec's proof-status file under PROOF-POLICY (`hyperpolymath/standards`,
+`3-practice/PROOF-POLICY.adoc` at `9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5`).
 
-[cols="2,1,1,1,1,1", options="header"]
+* Every proof obligation is a row of the proof ledger in
+  link:../../EXPLAINME.adoc#proof-ledger[EXPLAINME.adoc]. This file does not repeat
+  those rows.
+* This file holds what the policy asks for beyond the ledger: the theory theorems'
+  Proof Witness Grades with their receipts (§8), the import cone (§1.1), the assumptions
+  at the boundaries (§1.1), and the toolchain deviations (§6).
+* What is still needed is in link:PROOF-NEEDS.adoc[PROOF-NEEDS.adoc].
+
+== Engineering proofs (Idris2)
+
+The C ABI's interface contract is proved in Idris2 (PROOF-POLICY §1, "APIs, ABIs and
+engineering properties"):
+
+* `src/interface/Abi/Types.idr`: codes, exact decoding, and no answer with a failed
+  verdict;
+* `src/interface/Abi/Layout.idr`: the verdict struct's layout;
+* `src/interface/Abi/Foreign.idr`: the safe wrapper.
+
+Engineering proofs carry §5 status tokens only and are not graded on the PWG ladder
+(§8.1).
+
+* *Checker:* Idris2 0.7.0, built from the release commit
+  `27780073c8631826d846499840b3857d9b9a4fd5`.
+* *Invocation:* `idris2 --typecheck src/interface/abi.ipkg`. The CI step also fails on any
+  `Error` line, because `idris2` can exit 0 with one.
+* *Escape hatches:* every module is `%default total`. None contains `believe_me`,
+  `assert_total`, `assert_smaller`, `idris_crash`, `unsafePerformIO`, a hole or `partial`
+  (the scan uses the patterns of `mathesis/scripts/census/proof-holes.sh`).
+* *Import cone:* the `base` package of Idris2 0.7.0. Its own primitives (including the
+  `Data.Buffer` FFI) are the Idris2 runtime's trusted base. That reliance is the `argued`
+  FFI-marshalling row in the ledger.
+
+== Theory proofs: chain-of-trust soundness
+
+The theorems `secure-sound`, `insecure-sound`, `complete` and `fail-closed` are theory
+(§1). They are statements about the decision procedure of any validator that walks signed
+keys down from a trust anchor, not about one repository's code.
+
+[cols="1,3",options="header"]
 |===
-| Category | Total | Done | In Progress | Blocked | Remaining
+| Field | Value
 
-| ABI/FFI (ABI) | 5 | 0 | 0 | 0 | 5
-| Typing (TP) | 2 | 0 | 0 | 0 | 2
-| Invariant (INV) | 0 | 0 | 0 | 0 | 0
-| Security (SEC) | 0 | 0 | 0 | 0 | 0
-| Concurrency (CONC) | 0 | 0 | 0 | 0 | 0
-| Algorithm (ALG) | 0 | 0 | 0 | 0 | 0
-| Domain (DOM) | 0 | 0 | 0 | 0 | 0
-| *Total* | *7* | *0* | *0* | *0* | *7*
+| Source of truth
+| `verification/proofs/agda/ChainOfTrust.agda` (Agda)
+
+| `pwg`
+| `2ii`
+
+| `foundation_diverse`
+| `false` (Agda, Rocq and Lean are all dependent type theories, §8.3)
+
+| Agda leg
+| route: source; §5: `PROVEN`; §2.2: `AGDA-VERIFIED`
+
+| Rocq leg
+| route: `re-proved`; §5: `PROVEN`; §2.2: `RECONCILED`
+  (link:../../verification/proofs/CORRESPONDENCE.adoc[CORRESPONDENCE.adoc])
+
+| Lean leg
+| route: `re-proved`; §5: `PROVEN`; §2.2: `RECONCILED`
+  (link:../../verification/proofs/CORRESPONDENCE.adoc[CORRESPONDENCE.adoc])
+
+| Axioms
+| none in any leg: Agda `--safe` with no postulates; Rocq `Print Assumptions`:
+  "Closed under the global context" for each theorem; Lean `#print axioms`: "does not
+  depend on any axioms" for each theorem
+
+| Residual assumptions
+| `verify` is a parameter: unforgeability of the signature algorithms is outside the
+  proof. The model's scope, and the model-to-code link (`argued`), are as listed in
+  CORRESPONDENCE.adoc.
 |===
 
-*Overall*: 0% proven
+The grade is `PWG-2ii`. `PWG-1` additionally needs a current receipt for every witness
+from a headless pinned run on each commit. The `theory-proofs` CI job writes those
+receipts (`scripts/theory-receipts.sh`). Until a CI receipt exists for the commit in
+question, the grade stated here is `PWG-2ii`.
 
-== Proofs Done
+=== Import cone (§1.1)
 
-// Format:
-// | ID | Proof | Prover | File | Date | Verified By |
-// | ABI-1 | Non-null pointer proofs | Idris2 | verification/proofs/idris2/ABI/Pointers.idr | 2026-XX-XX | idris2 --check |
+* *Agda:* root module `ChainOfTrust`; flags `--safe --without-K --cubical-compatible`; no
+  imports; postulate count 0 (`--safe`, plus the comment-aware scan in
+  `scripts/theory-receipts.sh`); no library.
+* *Rocq:* the prelude only; no `Require`.
+* *Lean:* core only; no imports, no Mathlib.
 
-[cols="1,3,1,3,1,2", options="header"]
+=== Receipts
+
+Session run, `scripts/theory-receipts.sh`, on source commit
+`d283ab6da5519ae37b7ec534728472d328bd7b0a` with the proof files clean:
+
+[cols="1,2,1,3",options="header"]
 |===
-| ID | Proof | Prover | File | Date | Verified By
+| Leg | Checker and version | Result | Input digest
 
-| — | No proofs completed yet | — | — | — | —
-|===
+| agda
+| Agda version 2.6.3; `agda --safe --without-K --cubical-compatible ChainOfTrust.agda`
+| proven, axioms: none
+| `sha256:a9968f659fafdd0ca596f73fb5fbb99da803520703e8556fb7ba89cf2e168101`
 
-== Proofs In Progress
+| rocq
+| The Coq Proof Assistant, version 8.18.0; `coqc ChainOfTrust.v`
+| proven, axioms: none
+| `sha256:aefaaee247da5ab4e2fc5ff51fb4d5ff60fe13ae7780e9d3c209410d8a5eb2e9`
 
-[cols="1,3,1,2,1,2", options="header"]
-|===
-| ID | Proof | Prover | Assignee | Started | Blocker
-
-| — | — | — | — | — | —
-|===
-
-== Proofs Blocked
-
-[cols="1,3,2,3", options="header"]
-|===
-| ID | Proof | Blocked By | Notes
-
-| — | — | — | —
-|===
-
-== Proofs Remaining
-
-[cols="1,3,1,1,1,1", options="header"]
-|===
-| ID | Proof | Category | Prover | Priority | Est. Effort
-
-| ABI-1 | Non-null pointer proofs | ABI | Idris2 | P1 | 2h
-| ABI-2 | Memory layout correctness | ABI | Idris2 | P1 | 4h
-| ABI-3 | Platform type size proofs | ABI | Idris2 | P1 | 2h
-| ABI-4 | FFI function return type proofs | ABI | Idris2 | P1 | 2h
-| ABI-5 | C ABI compliance | ABI | Idris2 | P1 | 4h
-| TP-1 | Core data type well-formedness | TP | Idris2 | P1 | 4h
-| TP-2 | Public API type safety | TP | Lean4 | P2 | 4h
+| lean
+| Lean (version 4.15.0, commit 11651562caae, Release); `lean ChainOfTrust.lean`
+| proven, axioms: none
+| `sha256:f66ec2f17458d246cfd1ab92231425a98c9d084175e890e3d2a39f089a7041fc`
 |===
 
-== Verification Commands
+That run was not headless or isolated. It is a working receipt, not a `PWG-1` one. The
+negative controls run with it (a fail-open `check` in each prover, a postulate under
+`--safe`, a planted Lean `axiom` and a planted Rocq `Axiom`) were each rejected.
+
+== Assumptions at the boundaries (§1.1)
+
+Each assumption is an `argued` row in the ledger:
+
+* *Idris2 FFI marshalling:* the Chez backend of Idris2 0.7.0
+  (`27780073c8631826d846499840b3857d9b9a4fd5`) passes values as the `%foreign` types in
+  `src/interface/Abi/Foreign.idr` say.
+* *Signature verification:* Zig 0.17.0's `std.crypto`. The RFC known-answer vectors in
+  `tests/vectors.zig` test the calls, not the primitives.
+* *TLS:* Zig 0.17.0's `std.crypto.tls.Client`, used by the DoH transport.
+
+== Toolchain deviations (§6)
+
+None of the proof toolchains is installed through the Guix manifest or the container.
+The CI runners have no Guix, and `build/container/Containerfile` does not include the
+provers. Each install asserts the version it got, and fails on a mismatch.
+
+[cols="1,2,2,1",options="header"]
+|===
+| Leg | Tool, version, digest | Installed how | State
+
+| Idris2 ABI model
+| Idris2 0.7.0, release commit `27780073c8631826d846499840b3857d9b9a4fd5` (asserted by `git rev-parse`)
+| built from source in `zig-ci.yml`, job `abi-seam`
+| `open`
+
+| Agda theory leg
+| `agda-bin 2.6.3-1build1`; `/usr/bin/agda` sha256 `852806142a15951f667df303c73cfce5f4123218ce6e1f1b29acaddc242af00d` (Ubuntu 24.04)
+| apt, `zig-ci.yml`, job `theory-proofs`
+| `open`
+
+| Rocq leg
+| `coq 8.18.0+dfsg-1build2`; `/usr/bin/coqc` sha256 `f14ab0c140bdfdb31c7e7e1f20379703973376480a4eea2d43d0fa56ddae03ec` (Ubuntu 24.04)
+| apt, `zig-ci.yml`, job `theory-proofs`
+| `open`
+
+| Lean leg
+| Lean 4.15.0 release tarball, sha256 `af71a2569a9f68337de2434829b3008cd8e32c436e9cb6bd8c84a2c2ba3585c9` (verified before unpacking)
+| GitHub release download, `zig-ci.yml`, job `theory-proofs`
+| `open`
+|===
+
+Each deviation closes when the provers are reachable through `build/guix.scm` or the
+container and CI installs them from there.
+
+== Template proof files
+
+The template ships example proofs under `verification/proofs/`: `agda/Properties.agda`,
+`coq/TypeSafety.v`, `lean4/ApiTypes.lean`, `idris2/` and `tlaplus/`. They are not
+zig-dnssec obligations and have no ledger rows. `scripts/check-proofs.sh` still checks
+them against their MANIFEST entries, so a change in their state shows up.
+
+== Checking
 
 [source,bash]
 ----
-# Check all Idris2 proofs
-just proof-check-idris2
-
-# Check all Lean4 proofs
-just proof-check-lean4
-
-# Check all Agda proofs
-just proof-check-agda
-
-# Check all Coq proofs
-just proof-check-coq
-
-# Run all proof checks
-just proof-check-all
-
-# Scan for dangerous patterns
-panic-attack assail --proofs-only
+idris2 --typecheck src/interface/abi.ipkg   # engineering proofs
+just abi-e2e                                # Idris2 -> C ABI -> Zig
+scripts/theory-receipts.sh                  # theory: Agda, Rocq, Lean, with receipts
+scripts/check-proofs.sh agda                # every MANIFEST entry, per prover
+scripts/check-proofs.sh coq
+scripts/check-proofs.sh lean4
 ----
-
-== Changelog
-
-[cols="1,3,1", options="header"]
-|===
-| Date | Change | By
-
-| 2026-04-04 | Initial proof status tracking | Template
-|===

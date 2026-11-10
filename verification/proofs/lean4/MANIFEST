@@ -1,4 +1,5 @@
 # Lean4 proof manifest — read by scripts/check-proofs.sh lean4
 # Format: <source-root>|<module-relative-to-source-root>|gated|quarantine|<note>
 # Ground-truthed 2026-07-17 with Lean leanprover/lean4:v4.15.0 (via elan).
-verification/proofs/lean4|ApiTypes.lean|quarantine| ApiTypes.lean:44 `Nat.zero_le max` application type mismatch — `max` used where Nat is expected; has never compiled
+verification/proofs/lean4|ApiTypes.lean|gated| template example, not a zig-dnssec obligation; compiles on Lean 4.15.0 (lean-toolchain), so promoted from quarantine
+verification/proofs/lean4|ChainOfTrust.lean|gated| chain-of-trust soundness, Lean leg (re-proved; see ../CORRESPONDENCE.adoc)
