@@ -57,6 +57,9 @@ GOST R 34.11 and SM3 are absent.
   minimal CONNECT proxy that logged `GET /dns-query HTTP/1.1` as the first tunnelled
   bytes. The DoH transport therefore does not use `std.http.Client`; it uses
   `std.http.Reader` and `std.http.Client.Response.Head.parse` for the response only.
+  Unchanged in 0.17.1 and on master (47ff97b). Upstream:
+  https://codeberg.org/ziglang/zig/issues/35294[ziglang/zig#35294], fix proposed in
+  https://codeberg.org/ziglang/zig/pulls/36484[ziglang/zig#36484] (unmerged on 2026-11-17).
 * No QUIC and no HTTP/2: DNS-over-QUIC (RFC 9250) and HTTP/2 DoH are not implementable
   from std alone.
 * No HPKE: Oblivious DoH (RFC 9230) is not implementable from std alone.

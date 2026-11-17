@@ -4,10 +4,12 @@
 //! DNS over HTTPS (RFC 8484), HTTP/1.1 over TLS, built directly on
 //! std.crypto.tls.Client and std.http's response-head parser.
 //!
-//! Why not std.http.Client: in Zig 0.17.0 its HTTPS-through-CONNECT-proxy
-//! path does not start TLS inside the tunnel, so the request (here: the DNS
-//! query) leaves the proxy in cleartext. That was verified by observation
-//! (see SECURITY.md). This transport opens its own connection, optionally
+//! Why not std.http.Client: in Zig 0.17.0, 0.17.1 and master (47ff97b) its
+//! HTTPS-through-CONNECT-proxy path does not start TLS inside the tunnel, so
+//! the request (here: the DNS query) leaves the proxy in cleartext. That was
+//! verified by observation (docs/architecture/THREAT-MODEL.adoc, "Findings
+//! made along the way"). Upstream: codeberg.org/ziglang/zig issue 35294, fix
+//! in pull 36484. This transport opens its own connection, optionally
 //! through an HTTP CONNECT proxy, and always performs TLS end to end with
 //! certificate and host-name verification against the configured bundle.
 //!

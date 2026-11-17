@@ -187,11 +187,14 @@ Every item here is a known limitation, not a hidden one.
 
 == Findings made along the way
 
-* *Zig 0.17.0 `std.http.Client` sends HTTPS requests in cleartext through a CONNECT
+* *Zig 0.17 `std.http.Client` sends HTTPS requests in cleartext through a CONNECT
   proxy.* After a successful CONNECT it reuses the plain connection without starting TLS.
   Observed with a local CONNECT proxy that logged `GET /dns-query HTTP/1.1` as the first
   tunnelled bytes. That is why the DoH transport is built on `std.crypto.tls.Client`
-  directly. This should be reported upstream.
+  directly. The defect is still present in 0.17.1 and on master (47ff97b). Upstream tracks
+  it as https://codeberg.org/ziglang/zig/issues/35294[ziglang/zig#35294]; the fix,
+  https://codeberg.org/ziglang/zig/pulls/36484[ziglang/zig#36484], was open and unmerged
+  on 2026-11-17.
 * *RFC 8080 §6 examples.* The published RRSIG lines omit the Algorithm field. Re-signing
   with the published private key reproduces the signatures byte for byte only when the
   Labels field is 3, but the owner `example.com.` has two labels, which RFC 4035 §5.3.1

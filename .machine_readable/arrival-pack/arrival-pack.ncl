@@ -78,7 +78,7 @@ Use plain JavaScript when this tooling is needed. TypeScript and ReScript migrat
 
 # This repo: `%{data.canonical_name}`  ·  clade `%{data.prefixed_name}`
 
-- **Identity** — uuid `%{data.uuid}`; clade `%{data.clade_primary}` (secondary `%{data.clade_secondary}`); born %{data.born}; forge `%{data.forge_gh}`.
+- **Identity** — chora id `%{data.uuid}`; clade `%{data.clade_primary}` (secondary `%{data.clade_secondary}`); born %{data.born}; forge `%{data.forge_gh}`.
 - **IS** — %{data.purpose}
 - **IS-NOT** — %{data.isnot}
 - **Where it sits** — pipeline position **%{data.pipeline_pos}**; chain `%{data.chain}`; coordination = `%{data.coordination}`.
