@@ -45,13 +45,13 @@
   ; 1-formats/deed/mappings/clade-to-repo-deed.adoc and
   ; meta-ecosystem-to-repo-deed.adoc.
   ;
-  ; THE UUID IS DERIVED, NOT ALLOCATED, NOT INVENTED. It is not stored: it is
-  ;     uuid5(namespace = URL, name = the header :repo-uuid string)
-  ; and anyone can recompute it (gv-clade-index:
-  ; docs/SPEC-clade-verisim-portal.adoc §Identity Model):
-  ;     uuidgen --sha1 --namespace @url --name "github.com/hyperpolymath/zig-dnssec"
-  ; The owner is part of the name, so part of the identity: record the owner
-  ; that is true today, and re-derive if the repo ever moves.
+  ; THE ID IS MINTED ONCE, NOT INVENTED. The header :repo-uuid is this repo's
+  ; chora id: the ADR-008 profile C UUIDv8 of its birth path,
+  ; github.com/hyperpolymath/zig-dnssec, in the domain gv-clade-index
+  ; (standards A1 rules U1 to U4). Until the registry lists this repo it is
+  ; written as the #u8 literal; after that, as the registry's opaque #uuid.
+  ; It is carried opaquely and never re-derived: a transfer or rename does
+  ; not change it. Do not edit it.
   ;
   ; CHOOSE A CLADE. A CLOSED TAXONOMY OF 12 CATEGORIES, NOT AN ABBREVIATION
   ; SCHEME: the two letters abbreviate the clade's name, never your repo's.
@@ -1153,6 +1153,7 @@
         ".github/workflows/sonarqube.yml"
         ".github/workflows/static-analysis-gate.yml"
         ".gitignore"
+        ".machine_readable/arrival-pack/arrival-pack.ncl"
         ".machine_readable/coaptation/receipts/latest.toml"
         ".machine_readable/coaptation/witness-map.ncl"
         ".machine_readable/compliance/reuse/dep5"
