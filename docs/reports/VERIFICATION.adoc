@@ -286,7 +286,9 @@ bash scripts/check-variant-drift.sh ../parent-pin .
   it as missing; either the template republishes it or the mint records the
   tree hash as the identity to check.
 * *Zig 0.17.0 `std.http.Client` + CONNECT proxy sends HTTPS requests in cleartext*
-  (`docs/developer/ZIG-STD-SURVEY.adoc`). Worth an upstream report.
+  (`docs/developer/ZIG-STD-SURVEY.adoc`). Already tracked upstream as
+  https://codeberg.org/ziglang/zig/issues/35294[ziglang/zig#35294], with the fix in
+  https://codeberg.org/ziglang/zig/pulls/36484[ziglang/zig#36484].
 * *RFC 8080 §6*: the example signatures carry Labels=3 for a two-label owner, which a
   validator must reject (`tests/vectors.zig`).
 * `drill -S` reported success for the DNSKEY RRset of a zone whose signatures had

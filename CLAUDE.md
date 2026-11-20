@@ -60,7 +60,7 @@ Use plain JavaScript when this tooling is needed. TypeScript and ReScript migrat
 
 # This repo: `zig-dnssec`  ·  clade `pt-zig-dnssec`
 
-- **Identity** — uuid `f7d5bf31-3b1a-5c6f-bbf5-7e6ef587ab48`; clade `pt` (secondary `sc`); born 2026-10-13; forge `hyperpolymath/zig-dnssec`.
+- **Identity** — chora id `#u8"gv-clade-index:github.com/hyperpolymath/zig-dnssec"`; clade `pt` (secondary `sc`); born 2026-10-13; forge `hyperpolymath/zig-dnssec`.
 - **IS** — Experimental pure-Zig DNS wire-format codec and DNSSEC validator with a DNS-over-HTTPS stub client: authenticates answers from an untrusted upstream resolver to a configured trust anchor.
 - **IS-NOT** — a recursive resolver · an authoritative server · a DNS cache · independently reviewed
 - **Where it sits** — pipeline position **leaf**; chain `standards → rsr-template-repo → zig-dnssec`; coordination = `standards`.

@@ -49,10 +49,28 @@ items() {
 # hash12 -> short content hash of stdin (drift provenance)
 hash12() { sha256sum | cut -c1-12; }
 
-# The uuid is derived from the header :repo-uuid name, never stored (deed.abnf).
+# The identity is the deed's own TYPED literal, printed as written:
+# #uuid"<v8 id>" (minted once, A7 J11), or the computed #u8"<domain:name>".
+# The pack never prints a derived hex form of a name literal: that once put a
+# version 5 id in CLAUDE.md, which ADR-008's strict gate (owner ruling D320)
+# rejects in every minted repo. The typed literal says what the identifier is,
+# as ADR-008 asks. (Ported from rsr-template-repo main 0044ad9.)
 uuid_name="$(field '' repo-uuid)"
 uuid=""
-[ -z "$uuid_name" ] || uuid="$(bash "$READ" --uuid "$DEED")"
+if [[ -n "$uuid_name" ]]; then
+  # --typed keeps the tag and quotes, and reads the literal wherever the layout puts it
+  rc=0
+  uuid="$(bash "$READ" --typed "$DEED" '' repo-uuid)" || rc=$?
+  [[ "$rc" -le 1 ]] || exit "$rc"
+  [[ "$uuid" =~ ^#u(uid|[0-9]+)\"[^\"]*\"$ ]] || uuid=""
+fi
+[ -z "$uuid_name" ] || [ -n "$uuid" ] \
+  || { echo "extract.sh: $(basename "$DEED") :repo-uuid is not a typed #uuid\"...\" or #u<n>\"...\" literal" >&2; exit 2; }
+case "$uuid" in
+  '#u5"'*|'#uuid"'????????-????-5*)
+    echo "extract.sh: v5-identity: $(basename "$DEED") :repo-uuid $uuid is a version 5 id; the chora id is #uuid\"<v8 id of the birth path>\" (standards A1 V8)" >&2 ;;
+  *) ;;
+esac
 
 # read_clauses -> the clauses this pack reads, one token per line. Hashing only
 # these keeps an unrelated deed edit (say a canon-pin bump) from reading as drift.

@@ -120,8 +120,9 @@ link:src/stub/doh.zig[] and link:src/stub/client.zig[]. Every cross-check query 
 through this transport.
 
 Caveat::
-Zig 0.17.0's `std.http.Client` sends HTTPS requests in cleartext through a CONNECT proxy, so
-the transport drives `std.crypto.tls.Client` itself. Correctness of the TLS client is
+Zig 0.17's `std.http.Client` sends HTTPS requests in cleartext through a CONNECT proxy
+(https://codeberg.org/ziglang/zig/issues/35294[ziglang/zig#35294]), so the transport
+drives `std.crypto.tls.Client` itself. Correctness of the TLS client is
 assumed.
 
 === From C, Idris2 and other languages
